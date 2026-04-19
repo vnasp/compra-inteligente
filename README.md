@@ -1,37 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Smart Pantry - Optimizador de Compras
 
-## Getting Started
+Aplicación web para optimizar las compras del supermercado. Gestiona una lista de compras con precios, calcula la mejor combinación de productos según tu presupuesto mensual (algoritmo knapsack) y permite escanear tu despensa para sugerir cantidades según nivel de stock.
 
-First, run the development server:
+> Nota: Proyecto personal en desarrollo activo.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Funcionalidades
+
+- Lista de compras con categorías, marcas, precios y supermercado
+- Algoritmo knapsack para optimizar compras según presupuesto
+- Escaneo de despensa con niveles de stock (vacío, bajo, medio, lleno)
+- Sugerencia automática de cantidades a comprar
+- Configuración de presupuesto mensual, días de compra y supermercados
+- Registro de compras realizadas
+- Soporte para productos por envase y a granel
+- Autenticación y middleware con Supabase
+
+## Tecnologías
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Supabase (Auth, Database, SSR)
+- Tailwind CSS 4
+
+## Estructura del Proyecto
+
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# smart-pantry
+smart-pantry/
+├── src/
+│   ├── app/
+│   │   ├── api/             # API routes
+│   │   ├── page.tsx         # Página principal
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── ShoppingListPanel.tsx
+│   │   ├── EscanearDespensa.tsx
+│   │   ├── RegistrarCompra.tsx
+│   │   ├── ConfigPanel.tsx
+│   │   └── shopping-list/
+│   ├── utils/
+│   │   ├── knapsack.ts      # Algoritmo de optimización
+│   │   ├── stock.ts         # Lógica de niveles de stock
+│   │   └── supabase/
+│   ├── types/
+│   │   └── shopping.ts
+│   └── middleware.ts
+└── supabase/
+    └── migrations/          # Migraciones SQL
+```
