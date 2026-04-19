@@ -36,7 +36,7 @@ export default function Dashboard() {
     const load = async () => {
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
-      const { data } = await supabase.from("stock_levels").select("*");
+      const { data } = await supabase.from("pantry_stock_levels").select("*");
       if (data) {
         const levels: Record<string, number> = {};
         for (const row of data) {
@@ -58,7 +58,7 @@ export default function Dashboard() {
         .toISOString()
         .split("T")[0];
       const { data } = await supabase
-        .from("purchases")
+        .from("pantry_purchases")
         .select("*")
         .gte("purchased_at", firstDay)
         .order("purchased_at", { ascending: false });
@@ -76,7 +76,7 @@ export default function Dashboard() {
     const { createClient } = await import("@/utils/supabase/client");
     const supabase = createClient();
     await supabase
-      .from("stock_levels")
+      .from("pantry_stock_levels")
       .upsert({ item_id: id, level }, { onConflict: "item_id" });
   };
 
@@ -113,7 +113,7 @@ export default function Dashboard() {
       for (const p of data.prices) {
         if (p.price) {
           await supabase
-            .from("shopping_list_items")
+            .from("pantry_shopping_list_items")
             .update({ last_price: p.price, price_updated_at: now })
             .eq("id", p.id);
           updated++;

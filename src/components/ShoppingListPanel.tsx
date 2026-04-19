@@ -30,7 +30,7 @@ export function ShoppingListPanel({
   useEffect(() => {
     const supabase = createClient();
     supabase
-      .from("shopping_list_items")
+      .from("pantry_shopping_list_items")
       .select("*")
       .order("created_at", { ascending: false })
       .then(({ data }) => {
@@ -54,7 +54,7 @@ export function ShoppingListPanel({
     );
     const supabase = createClient();
     await supabase
-      .from("shopping_list_items")
+      .from("pantry_shopping_list_items")
       .update({ is_active: val, updated_at: new Date().toISOString() })
       .eq("id", id);
   };
@@ -62,7 +62,7 @@ export function ShoppingListPanel({
   const handleDelete = async (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     const supabase = createClient();
-    await supabase.from("shopping_list_items").delete().eq("id", id);
+    await supabase.from("pantry_shopping_list_items").delete().eq("id", id);
   };
 
   const handleSave = async (form: FormState) => {
@@ -86,7 +86,7 @@ export function ShoppingListPanel({
 
     if (editing) {
       const { data } = await supabase
-        .from("shopping_list_items")
+        .from("pantry_shopping_list_items")
         .update(payload)
         .eq("id", editing.id)
         .select()
@@ -100,7 +100,7 @@ export function ShoppingListPanel({
       }
     } else {
       const { data } = await supabase
-        .from("shopping_list_items")
+        .from("pantry_shopping_list_items")
         .insert({ ...payload, created_at: new Date().toISOString() })
         .select()
         .single();

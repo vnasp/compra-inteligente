@@ -40,7 +40,7 @@ export function RegistrarCompra({
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
       const { data, error } = await supabase
-        .from("purchases")
+        .from("pantry_purchases")
         .insert({
           amount: parsed,
           supermarket,

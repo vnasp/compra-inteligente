@@ -49,7 +49,7 @@ export function ConfigPanel({
   useEffect(() => {
     const supabase = createClient();
     supabase
-      .from("user_config")
+      .from("pantry_user_config")
       .select("*")
       .limit(1)
       .single()
@@ -83,7 +83,7 @@ export function ConfigPanel({
 
     if (config) {
       const { data } = await supabase
-        .from("user_config")
+        .from("pantry_user_config")
         .update(payload)
         .eq("id", config.id)
         .select()
@@ -91,7 +91,7 @@ export function ConfigPanel({
       if (data) setConfig(data as UserConfig);
     } else {
       const { data } = await supabase
-        .from("user_config")
+        .from("pantry_user_config")
         .insert({ ...payload, created_at: new Date().toISOString() })
         .select()
         .single();
