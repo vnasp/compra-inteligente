@@ -162,6 +162,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!config) return;
     const today = new Date();
+    // Si hoy es jueves (4), la próxima compra es hoy mismo
+    if (today.getDay() === 4) {
+      setNextShoppingDate(
+        today.toLocaleDateString("es-CL", { day: "numeric", month: "long" }),
+      );
+      return;
+    }
     const currentDay = today.getDate();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
@@ -170,6 +177,9 @@ export default function Dashboard() {
     const target = nextDay
       ? new Date(currentYear, currentMonth, nextDay)
       : new Date(currentYear, currentMonth + 1, sorted[0] ?? 1);
+    // Ajustar al próximo jueves (0=Dom, 4=Jue)
+    const daysUntilThursday = (4 - target.getDay() + 7) % 7;
+    target.setDate(target.getDate() + daysUntilThursday);
     setNextShoppingDate(
       target.toLocaleDateString("es-CL", { day: "numeric", month: "long" }),
     );

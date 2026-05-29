@@ -25,19 +25,18 @@ interface CandidateProduct {
   price: number;
 }
 
-function extractPrice(
-  html: string,
-  name: string,
-  _brand: string,
-  packageSize: number | null,
-  packageUnit: string | null,
-): number | null {
-  // Jumbo uses data-cnstrc-item-price="6490" with product title in the same element
+function stripSizeFromText(text: string): string {
+  return text
+    .replace(/\b\d+[\.,]?\d*\s*(g|kg|ml|l|cc|cl|un\.?|lt)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractCandidates(html: string): CandidateProduct[] {
   const candidateRegex =
     /([^"]*?)"\s+data-cnstrc-item-id="[^"]*"\s+data-cnstrc-item-price="(\d+)"/g;
   const candidates: CandidateProduct[] = [];
   let match;
-
   while ((match = candidateRegex.exec(html)) !== null) {
     const title = match[1].toLowerCase();
     const price = parseInt(match[2], 10);
@@ -45,7 +44,16 @@ function extractPrice(
       candidates.push({ title, price });
     }
   }
+  return candidates;
+}
 
+function extractPrice(
+  candidates: CandidateProduct[],
+  name: string,
+  _brand: string,
+  packageSize: number | null,
+  packageUnit: string | null,
+): number | null {
   if (candidates.length === 0) return null;
 
   // Build search terms from the product name
@@ -54,12 +62,13 @@ function extractPrice(
     .split(/\s+/)
     .filter((w) => w.length > 2);
 
-  // Score each candidate by how many name words match, penalizing extra words
+  // Score each candidate by how many name words match, penalizing both
+  // extra words in the candidate AND unmatched words from the query
   const scored = candidates.map((c) => {
     const wordMatches = nameWords.filter((w) => c.title.includes(w)).length;
     const candidateWords = c.title.split(/\s+/).filter((w) => w.length > 2);
-    const ratio =
-      candidateWords.length > 0 ? wordMatches / candidateWords.length : 0;
+    const denominator = Math.max(nameWords.length, candidateWords.length);
+    const ratio = denominator > 0 ? wordMatches / denominator : 0;
 
     // Bonus for matching package size (e.g. "800 g")
     let sizeMatch = false;
@@ -124,40 +133,99 @@ export async function POST(request: NextRequest) {
     }
 
     const prices: PriceResult[] = [];
+    let sessionCookies = "";
+
+    const fetchHtml = async (url: string): Promise<string | null> => {
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "es-CL,es;q=0.9",
+      };
+      if (sessionCookies) headers["Cookie"] = sessionCookies;
+      const res = await fetch(url, { cache: "no-store", headers });
+      // Capture AWSALB sticky-session cookies for subsequent requests
+      const setCookie = res.headers.get("set-cookie");
+      if (setCookie) {
+        const awsalb = setCookie.match(/AWSALB=[^;]+/)?.[0];
+        const awsalbcors = setCookie.match(/AWSALBCORS=[^;]+/)?.[0];
+        if (awsalb || awsalbcors) {
+          sessionCookies = [awsalb, awsalbcors].filter(Boolean).join("; ");
+        }
+      }
+      if (!res.ok) return null;
+      return res.text();
+    };
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const sizePart = item.package_size
-        ? `${item.package_size} ${item.package_unit ?? ""}`.trim()
-        : "";
-      const ftPart = `${item.name} ${sizePart}`.trim();
       const brandParam = item.brand
         ? `&b=${encodeURIComponent(item.brand)}`
         : "";
-      const url = `https://www.jumbo.cl/busqueda?ft=${encodeURIComponent(ftPart)}${brandParam}`;
+
+      // Strip brand from name (brand already goes in &b= filter).
+      // Leaving it in ft= causes 0 results when brand has special chars (e.g. "Cuisine & Co").
+      const nameNoBrand = item.brand
+        ? item.name
+            .replace(
+              new RegExp(
+                item.brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                "i",
+              ),
+              "",
+            )
+            .replace(/\s+/g, " ")
+            .trim()
+        : item.name;
+
+      // Extra size from package fields (only if not already embedded in name)
+      const sizePart =
+        item.package_size &&
+        !nameNoBrand.toLowerCase().includes(String(item.package_size))
+          ? `${item.package_size} ${item.package_unit ?? ""}`.trim()
+          : "";
+
+      const ftWithSize = `${nameNoBrand} ${sizePart}`.trim();
+      const ftClean = stripSizeFromText(nameNoBrand); // strip sizes embedded in name text
+
+      // Build ordered query list: with brand first, then without brand as fallback.
+      // Deduplicated so we never make the same request twice.
+      const seenQueries = new Set<string>();
+      const queries: Array<[ft: string, bParam: string]> = [];
+      for (const ft of [...new Set([ftWithSize, ftClean])]) {
+        for (const b of brandParam ? [brandParam, ""] : [""]) {
+          const key = ft + b;
+          if (!seenQueries.has(key)) {
+            seenQueries.add(key);
+            queries.push([ft, b]);
+          }
+        }
+      }
+
       console.log(
-        `[scrape-prices] searching: "${ftPart}" brand="${item.brand}" -> ${url}`,
+        `[scrape-prices] searching: "${ftWithSize}" brand="${item.brand}"`,
       );
 
       try {
-        const res = await fetch(url, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept: "text/html,application/xhtml+xml",
-            "Accept-Language": "es-CL,es;q=0.9",
-          },
-        });
+        let candidates: CandidateProduct[] = [];
 
-        if (!res.ok) {
-          prices.push({ id: item.id, price: null, source: "jumbo.cl" });
-          continue;
+        for (let q = 0; q < queries.length; q++) {
+          const [ft, b] = queries[q];
+          const url = `https://www.jumbo.cl/busqueda?ft=${encodeURIComponent(ft)}${b}`;
+          const html = await fetchHtml(url);
+          if (html) {
+            candidates = extractCandidates(html);
+            console.log(
+              `[scrape-prices] ft="${ft}" b="${b ? item.brand : "none"}" html:${html.length} candidates:${candidates.length}`,
+            );
+          }
+          if (candidates.length > 0) break;
+          if (q < queries.length - 1) await sleep(400);
         }
 
-        const html = await res.text();
         const price = extractPrice(
-          html,
-          item.name,
+          candidates,
+          ftWithSize,
           item.brand,
           item.package_size,
           item.package_unit,
