@@ -40,12 +40,12 @@ export function FormView({
   );
 
   const inputClass =
-    "w-full px-3 py-2.5 rounded-xl border-[1.5px] border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none box-border";
-  const labelClass = "block font-bold text-xs text-slate-700 mb-1";
+    "w-full px-3 py-2.5 rounded-xl border-[1.5px] border-border-soft bg-bg-soft text-sm text-text-primary outline-none box-border focus:border-greenCustom-400";
+  const labelClass = "block font-semibold text-xs text-text-secondary mb-1";
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
-      <h3 className="mt-0 mb-4 text-base font-black text-slate-800">
+      <h3 className="text-text-primary mt-0 mb-4 text-base font-bold">
         {initial ? "Editar producto" : "Nuevo producto"}
       </h3>
 
@@ -90,16 +90,16 @@ export function FormView({
 
         {/* Cantidad + Tamaño del envase */}
         <div className="flex items-center justify-between">
-          <span className="block text-[13px] font-bold text-slate-700">
+          <span className="text-text-secondary block text-xs font-semibold">
             Cantidad a comprar
           </span>
-          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-extrabold text-indigo-700">
+          <span className="bg-greenCustom-100 text-greenCustom-700 rounded-full px-2.5 py-0.5 text-xs font-bold">
             {form.package_size
-              ? `${form.quantity || "?"} x ${form.package_size} ${form.package_unit}`
+              ? `${form.quantity || "?"} × ${form.package_size} ${form.package_unit}`
               : `${form.quantity || "?"} ${form.unit}`}
           </span>
         </div>
-        <div className="flex flex-col gap-2.5 rounded-xl border-[1.5px] border-slate-200 bg-slate-50 p-3.5">
+        <div className="border-border-soft bg-bg-soft flex flex-col gap-2.5 rounded-xl border-[1.5px] p-3.5">
           {/* Row 1: quantity + unit */}
           <div className="flex gap-2.5">
             <div className="flex-1">
@@ -135,11 +135,11 @@ export function FormView({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-dashed border-slate-200" />
+          <div className="border-border-soft border-t border-dashed" />
 
           {/* Row 2: package size */}
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500">
+            <label className="text-text-muted mb-1 block text-xs font-semibold">
               Tamaño del envase{" "}
               <span className="text-[11px] font-normal">(opcional)</span>
             </label>
@@ -170,7 +170,7 @@ export function FormView({
                 </select>
               </div>
             </div>
-            <p className="mt-1 mb-0 text-[11px] text-slate-500">
+            <p className="text-text-muted mt-1 mb-0 text-[11px]">
               Completa si el producto tiene un tamaño fijo por envase (ej. 850
               g, 1 L, 20 un)
             </p>
@@ -184,10 +184,10 @@ export function FormView({
             <button
               type="button"
               onClick={() => setForm({ ...form, is_required: true })}
-              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-bold transition-colors ${
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-semibold transition-colors ${
                 form.is_required
-                  ? "border-indigo-500 bg-indigo-500 text-white"
-                  : "border-slate-200 bg-white text-slate-400 hover:border-indigo-300"
+                  ? "border-greenCustom-600 bg-greenCustom-700 text-white"
+                  : "border-border-soft bg-bg-card text-text-muted hover:border-greenCustom-300"
               }`}
             >
               Requerido
@@ -195,16 +195,16 @@ export function FormView({
             <button
               type="button"
               onClick={() => setForm({ ...form, is_required: false })}
-              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-bold transition-colors ${
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-semibold transition-colors ${
                 !form.is_required
-                  ? "border-slate-500 bg-slate-500 text-white"
-                  : "border-slate-200 bg-white text-slate-400 hover:border-slate-300"
+                  ? "border-text-secondary bg-text-secondary text-white"
+                  : "border-border-soft bg-bg-card text-text-muted hover:border-border-default"
               }`}
             >
               Opcional
             </button>
           </div>
-          <p className="mt-1 mb-0 text-[11px] text-slate-500">
+          <p className="text-text-muted mt-1 mb-0 text-[11px]">
             {form.is_required
               ? "Siempre se compra, tiene prioridad en el presupuesto."
               : "Se compra solo si queda presupuesto disponible."}
@@ -212,8 +212,8 @@ export function FormView({
         </div>
 
         {/* Active toggle */}
-        <div className="flex items-center justify-between rounded-xl border-[1.5px] border-slate-200 bg-slate-50 px-3.5 py-2.5">
-          <span className="text-xs font-bold text-slate-700">
+        <div className="border-border-soft bg-bg-soft flex items-center justify-between rounded-xl border-[1.5px] px-3.5 py-2.5">
+          <span className="text-text-primary text-xs font-semibold">
             Activo en lista
           </span>
           <Toggle
@@ -222,22 +222,11 @@ export function FormView({
           />
         </div>
 
-        {/* Notes */}
-        <div>
-          <label className={labelClass}>Notas</label>
-          <textarea
-            className={`${inputClass} min-h-17.5 resize-y`}
-            placeholder="ej. Maduros preferiblemente"
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
-        </div>
-
         {/* Buttons */}
         <div className="mt-1 flex gap-2.5">
           <button
             onClick={onCancel}
-            className="flex-1 cursor-pointer rounded-xl border-[1.5px] border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-500"
+            className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft flex-1 cursor-pointer rounded-xl border-[1.5px] py-2.5 text-sm font-semibold transition-all"
           >
             Cancelar
           </button>
@@ -246,7 +235,7 @@ export function FormView({
               if (!form.name.trim()) return;
               onSave(form);
             }}
-            className="flex-2 cursor-pointer rounded-xl border-none bg-linear-to-r from-indigo-500 to-indigo-700 py-2.5 text-sm font-extrabold text-white shadow-[0_2px_8px_rgba(67,56,202,0.3)]"
+            className="bg-button-primary flex-2 cursor-pointer rounded-xl border-none py-2.5 text-sm font-bold text-white transition-all hover:opacity-90"
           >
             {initial ? "Guardar cambios" : "Agregar producto"}
           </button>
