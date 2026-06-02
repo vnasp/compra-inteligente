@@ -1,50 +1,100 @@
-# Smart Pantry - Optimizador de Compras
+# Compra Inteligente
 
-Aplicación web para optimizar las compras del supermercado. Gestiona una lista de compras con precios, calcula la mejor combinación de productos según tu presupuesto mensual (algoritmo knapsack) y permite escanear tu despensa para sugerir cantidades según nivel de stock.
+Sistema de optimización de compras de supermercado orientado al control de presupuesto, gestión de inventario doméstico y toma de decisiones de compra basada en datos reales.
 
-> Nota: Proyecto personal en desarrollo activo.
+El proyecto nació como una solución personal para reducir tiempo de planificación, evitar compras innecesarias y optimizar el presupuesto mensual considerando hábitos reales de consumo.
 
-## Funcionalidades
+## Características principales
 
-- Lista de compras con categorías, marcas, precios y supermercado
-- Algoritmo knapsack para optimizar compras según presupuesto
-- Escaneo de despensa con niveles de stock (vacío, bajo, medio, lleno)
-- Sugerencia automática de cantidades a comprar
-- Configuración de presupuesto mensual, días de compra y supermercados
-- Registro de compras realizadas
-- Soporte para productos por envase y a granel
-- Autenticación y middleware con Supabase
+- Gestión de inventario doméstico
+- Presupuesto mensual configurable
+- Optimización automática de compras
+- Web scraping de precios desde supermercado
+- Integración de boletas mediante carga manual
+- Matching automático por código de barras
+- Compartir lista optimizada vía WhatsApp
+- Programación inteligente de próximas compras
+- Integración con Google Calendar
 
-## Tecnologías
+## Cómo funciona
 
-- Next.js 16 (App Router)
-- React 19
+El sistema combina:
+
+- Lista de compras del hogar
+- Inventario actual de mercaderia
+- Presupuesto disponible
+- Historial de compras
+- Precios actualizados mediante scraping
+- Restricciones temporales de compra
+
+para generar una lista de compra optimizada.
+
+Además, el motor considera preferencias reales de compra, como:
+
+- días con descuentos bancarios
+- frecuencia mensual de compras
+- fechas objetivo
+- prioridad de productos
+- stock disponible
+
+## Arquitectura
+
+El proyecto integra múltiples componentes:
+
+- Frontend web responsive
+- Sistema de scraping automatizado
+- Gestión de inventario
+- Persistencia de datos
+- Motor de optimización
+- Integraciones externas
+- Automatización de flujos
+
+## Stack tecnológico
+
+### Frontend
+
+- React
 - TypeScript
-- Supabase (Auth, Database, SSR)
-- Tailwind CSS 4
+- TailwindCSS
 
-## Estructura del Proyecto
+### Backend / Infraestructura
 
-```
-smart-pantry/
-├── src/
-│   ├── app/
-│   │   ├── api/             # API routes
-│   │   ├── page.tsx         # Página principal
-│   │   └── layout.tsx
-│   ├── components/
-│   │   ├── ShoppingListPanel.tsx
-│   │   ├── EscanearDespensa.tsx
-│   │   ├── RegistrarCompra.tsx
-│   │   ├── ConfigPanel.tsx
-│   │   └── shopping-list/
-│   ├── utils/
-│   │   ├── knapsack.ts      # Algoritmo de optimización
-│   │   ├── stock.ts         # Lógica de niveles de stock
-│   │   └── supabase/
-│   ├── types/
-│   │   └── shopping.ts
-│   └── middleware.ts
-└── supabase/
-    └── migrations/          # Migraciones SQL
-```
+- Supabase
+- PostgreSQL
+
+### Automatización
+
+- Web Scraping
+- Integración Google Calendar
+- Integración WhatsApp
+
+## Motivación
+
+La mayoría de las aplicaciones de compras se limitan a listas manuales.
+
+Este proyecto busca resolver un problema más amplio:
+
+> ¿Cómo optimizar las compras del supermercado considerando presupuesto, inventario, precios reales y hábitos de consumo?
+
+## Estado actual
+
+Proyecto personal en desarrollo activo.
+
+## Capturas
+
+<img width="100%" alt="Compra Inteligente Dashboard" src="./docs/dashboard.png" />
+
+## Roadmap
+
+- OCR para procesamiento automático de boletas
+- Comparación multi-supermercado
+- Predicción de consumo
+- Recomendaciones inteligentes
+- Optimización multi-objetivo
+- Notificaciones automáticas
+
+## Autor
+
+Valentina Muñoz
+
+Frontend / Full Stack Engineer focused on building systems, automation and practical software solutions.
