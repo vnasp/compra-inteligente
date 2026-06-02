@@ -20,8 +20,8 @@ El proyecto nació como una solución personal para reducir tiempo de planificac
 
 El sistema combina:
 
-- Lista de compras del hogar
-- Inventario actual de mercaderia
+- Inventario doméstico actualizado
+- Historial y planificación de compras
 - Presupuesto disponible
 - Historial de compras
 - Precios actualizados mediante scraping
@@ -29,20 +29,14 @@ El sistema combina:
 
 para generar una lista de compra optimizada.
 
-Además, el motor considera preferencias reales de compra, como:
-
-- días con descuentos bancarios
-- frecuencia mensual de compras
-- fechas objetivo
-- prioridad de productos
-- stock disponible
+Además, el motor considera preferencias reales de compra, como días con descuentos bancarios, frecuencia mensual de compras, fechas objetivo, prioridad de productos, stock disponible.
 
 ## Arquitectura
 
 El proyecto integra múltiples componentes:
 
 - Frontend web responsive
-- Sistema de scraping automatizado
+- Motor de recopilación y actualización de precios
 - Gestión de inventario
 - Persistencia de datos
 - Motor de optimización
@@ -70,15 +64,13 @@ El proyecto integra múltiples componentes:
 
 ## Motivación
 
-La mayoría de las aplicaciones de compras se limitan a listas manuales.
-
-Este proyecto busca resolver un problema más amplio:
+La mayoría de las aplicaciones de compras se limitan a listas manuales. Este proyecto busca resolver un problema más amplio:
 
 > ¿Cómo optimizar las compras del supermercado considerando presupuesto, inventario, precios reales y hábitos de consumo?
 
 ## Estado actual
 
-Proyecto personal en desarrollo activo.
+Sistema personal en desarrollo continuo, utilizado para la gestión y optimización real de mis compras domésticas.
 
 ## Capturas
 
@@ -93,8 +85,6 @@ Proyecto personal en desarrollo activo.
 - Optimización multi-objetivo
 - Notificaciones automáticas
 
-## Autor
-
-Valentina Muñoz
-
-Frontend / Full Stack Engineer focused on building systems, automation and practical software solutions.
+## Demo pública
+El proyecto actualmente utiliza datos personales reales de consumo e inventario, por lo que la URL pública no se encuentra disponible.
+Las capturas y documentación reflejan funcionalidades reales implementadas en el sistema.
