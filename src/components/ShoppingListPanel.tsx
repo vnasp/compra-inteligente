@@ -18,11 +18,14 @@ export { INITIAL_ITEMS, CATEGORY_META, sortByCategory };
 export function ShoppingListPanel({
   items,
   setItems,
+  open,
+  onClose,
 }: {
   items: ShoppingListItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingListItem[]>>;
+  open: boolean;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [view, setView] = useState<"list" | "form">("list");
   const [editing, setEditing] = useState<ShoppingListItem | null>(null);
 
@@ -119,21 +122,10 @@ export function ShoppingListPanel({
 
   return (
     <div>
-      {/* Trigger button */}
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Abrir lista de compras"
-        className="fixed top-1/2 left-0 z-50 flex h-30 w-11 -translate-y-1/2 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-r-2xl border-none bg-linear-to-b from-indigo-500 to-indigo-700 p-0 shadow-[3px_0_16px_rgba(67,56,202,0.35)]"
-      >
-        <span className="rotate-180 text-sm font-black tracking-[0.05em] text-white [text-orientation:mixed] [writing-mode:vertical-rl]">
-          MI LISTA
-        </span>
-      </button>
-
       {/* Overlay */}
       {open && (
         <div
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="fixed inset-0 z-100 bg-[rgba(12,74,110,0.18)] backdrop-blur-[2px]"
         />
       )}
@@ -160,7 +152,7 @@ export function ShoppingListPanel({
               </p>
             </div>
             <button
-              onClick={() => setOpen(false)}
+              onClick={onClose}
               className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border-none bg-white/20 text-lg text-white"
             >
               ×

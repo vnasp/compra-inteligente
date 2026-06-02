@@ -35,9 +35,16 @@ export interface UserConfig {
   id: string;
   monthly_budget: number;
   shopping_days: number[];
+  shopping_weekday: number; // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
   supermarkets: string[];
   created_at: string;
   updated_at: string;
+}
+
+// ── Historial de precios ───────────────────────────────────────────────
+export interface PriceHistorySummary {
+  prevPrice: number | null; // precio anterior al actual (para tendencia ↑↓)
+  minPrice: number | null; // mínimo histórico registrado
 }
 
 // ── Compras realizadas ─────────────────────────────────────────────────

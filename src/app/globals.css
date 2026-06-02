@@ -1,20 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f8fafc;
-  --foreground: #1e293b;
-}
+@theme {
+  /* Backgrounds */
+  --color-bg-app: #f6f3ed;
+  --color-bg-surface: #fffdf9;
+  --color-bg-soft: #f0ece3;
+  --color-bg-card: #ffffff;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Primary greenCustoms */
+  --color-greenCustom-900: #0e5a37;
+  --color-greenCustom-800: #146b43;
+  --color-greenCustom-700: #1d7a4e;
+  --color-greenCustom-600: #2d9363;
+  --color-greenCustom-500: #46a36f;
+  --color-greenCustom-400: #7bbc8c;
+  --color-greenCustom-300: #a9d3b0;
+  --color-greenCustom-200: #d8e9da;
+  --color-greenCustom-100: #edf5ee;
+
+  /* Accent / Warm */
+  --color-accent-beige: #e8ddcc;
+  --color-accent-sand: #dccbb3;
+  --color-accent-cream: #f8f4ec;
+  --color-accent-gold-soft: #c9a86a;
+
+  /* Semantic */
+  --color-success: #2d9363;
+  --color-warning: #d89b4d;
+  --color-danger: #d96c6c;
+  --color-info: #6a8da8;
+
+  /* Text */
+  --color-text-primary: #1f2a24;
+  --color-text-secondary: #5f6b63;
+  --color-text-muted: #8a948d;
+  --color-text-inverse: #ffffff;
+
+  /* Borders */
+  --color-border-soft: #e7e1d7;
+  --color-border-default: #d9d2c6;
+
+  /* Buttons */
+  --color-button-primary: #146b43;
+  --color-button-primary-hover: #0e5a37;
+  --color-button-secondary: #edf5ee;
+
+  /* Tags */
+  --color-tag-essential-bg: #fce8e6;
+  --color-tag-essential-text: #c94f4f;
+
+  --color-tag-important-bg: #f8efd9;
+  --color-tag-important-text: #a8741a;
+
+  --color-tag-optional-bg: #e7f1ea;
+  --color-tag-optional-text: #2d9363;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-bg-app);
+  color: var(--color-foreground);
+  font-family: var(--color-font-interSerif-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }

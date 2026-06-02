@@ -12,7 +12,7 @@ const SUPERMARKET_OPTIONS = [
   "Acuenta",
 ];
 
-export function RegistrarCompra({
+export function AddPurchase({
   supermarkets,
   onSave,
   onClose,
@@ -29,6 +29,7 @@ export function RegistrarCompra({
   );
   const [tag, setTag] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +37,7 @@ export function RegistrarCompra({
     if (!parsed || parsed <= 0) return;
 
     setSaving(true);
+    setSaveError("");
     try {
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
@@ -54,7 +56,9 @@ export function RegistrarCompra({
       onSave(data as Purchase);
       onClose();
     } catch (err) {
-      console.error("Error registrando compra:", err);
+      setSaveError(
+        err instanceof Error ? err.message : "Error al guardar la compra",
+      );
     } finally {
       setSaving(false);
     }
@@ -165,6 +169,11 @@ export function RegistrarCompra({
             />
           </div>
 
+          {saveError && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
+              {saveError}
+            </p>
+          )}
           <button
             type="submit"
             disabled={saving || !amount}

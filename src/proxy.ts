@@ -1,14 +1,14 @@
 import { type NextRequest } from "next/server";
-import { createClient } from "@/utils/supabase/middleware";
+import { createClient } from "./utils/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return createClient(request);
 }
 
 export const config = {
   matcher: [
     /*
-     * Aplica el middleware a todas las rutas excepto:
+     * Aplica el proxy a todas las rutas excepto:
      * - _next/static  (archivos estáticos)
      * - _next/image   (optimización de imágenes)
      * - favicon.ico   (ícono del sitio)
