@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Ensure PATH includes common node locations for SourceTree
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+# Run lint-staged
+npm run lint-staged

@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+
+# Ensure PATH includes common node locations
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+# Detecta cambios respecto al upstream (si existe)
+UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)"
+if [ -n "$UPSTREAM" ]; then
+  BASE="$(git merge-base HEAD "$UPSTREAM")"
+else
+  BASE="$(git hash-object -t tree /dev/null)" # fallback: todo el repo
+fi
+
+# Evita correr en cambios de docs, etc.
+CHANGED="$(git diff --name-only --diff-filter=ACMR "$BASE"...HEAD | grep -E '^(src|tests?|package\.json|vite|tsconfig|eslint|vitest)' || true)"
+[ -z "$CHANGED" ] && echo "Sin cambios relevantes: saltando tests/build." && exit 0
+
+export CI=true
+
+echo "Ejecutando tests con cobertura…"
+npm run test:coverage:quiet || { echo "Tests fallaron (verifica que el coverage supere los umbrales definidos en vitest.config.ts)"; exit 1; }
+
+echo "Compilando app…"
+npm run build:quiet || { echo "Build falló"; exit 1; }
+
+echo "Verificando vulnerabilidades de seguridad…"
+npm audit --omit=dev --audit-level=high || { echo "⚠  Vulnerabilidades high/critical detectadas. Ejecuta 'npm audit' para ver detalles y 'npm audit fix' si corresponde."; exit 1; }
+
+echo "Checks OK: procediendo con el push."

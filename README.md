@@ -1,37 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Compra Inteligente
 
-## Getting Started
+Sistema de optimización de compras de supermercado orientado al control de presupuesto, gestión de inventario doméstico y toma de decisiones de compra basada en datos reales.
 
-First, run the development server:
+El proyecto nació como una solución personal para reducir tiempo de planificación, evitar compras innecesarias y optimizar el presupuesto mensual considerando hábitos reales de consumo.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Características principales
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Gestión de inventario doméstico
+- Presupuesto mensual configurable
+- Optimización automática de compras
+- Web scraping de precios desde supermercado
+- Integración de boletas mediante carga manual
+- Matching automático por código de barras
+- Compartir lista optimizada vía WhatsApp
+- Programación inteligente de próximas compras
+- Integración con Google Calendar
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Cómo funciona
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+El sistema combina:
 
-## Learn More
+- Lista de compras del hogar
+- Inventario actual de mercaderia
+- Presupuesto disponible
+- Historial de compras
+- Precios actualizados mediante scraping
+- Restricciones temporales de compra
 
-To learn more about Next.js, take a look at the following resources:
+para generar una lista de compra optimizada.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Además, el motor considera preferencias reales de compra, como:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- días con descuentos bancarios
+- frecuencia mensual de compras
+- fechas objetivo
+- prioridad de productos
+- stock disponible
 
-## Deploy on Vercel
+## Arquitectura
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El proyecto integra múltiples componentes:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# smart-pantry
+- Frontend web responsive
+- Sistema de scraping automatizado
+- Gestión de inventario
+- Persistencia de datos
+- Motor de optimización
+- Integraciones externas
+- Automatización de flujos
+
+## Stack tecnológico
+
+### Frontend
+
+- React
+- TypeScript
+- TailwindCSS
+
+### Backend / Infraestructura
+
+- Supabase
+- PostgreSQL
+
+### Automatización
+
+- Web Scraping
+- Integración Google Calendar
+- Integración WhatsApp
+
+## Motivación
+
+La mayoría de las aplicaciones de compras se limitan a listas manuales.
+
+Este proyecto busca resolver un problema más amplio:
+
+> ¿Cómo optimizar las compras del supermercado considerando presupuesto, inventario, precios reales y hábitos de consumo?
+
+## Estado actual
+
+Proyecto personal en desarrollo activo.
+
+## Capturas
+
+<img width="100%" alt="Compra Inteligente Dashboard" src="./docs/dashboard.png" />
+
+## Roadmap
+
+- OCR para procesamiento automático de boletas
+- Comparación multi-supermercado
+- Predicción de consumo
+- Recomendaciones inteligentes
+- Optimización multi-objetivo
+- Notificaciones automáticas
+
+## Autor
+
+Valentina Muñoz
+
+Frontend / Full Stack Engineer focused on building systems, automation and practical software solutions.
