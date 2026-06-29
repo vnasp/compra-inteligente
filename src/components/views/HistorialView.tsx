@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { FileText, Trash2, CalendarCheck, AlertTriangle } from "lucide-react";
 import type { Purchase } from "@/types/shopping";
 
 interface HistorialViewProps {
@@ -11,6 +12,7 @@ interface HistorialViewProps {
   onOpenPurchase: () => void;
   onOpenBoleta: () => void;
   onDeletePurchase: (id: string) => void;
+  onCloseCycle: () => void | Promise<void>;
 }
 
 export function HistorialView({
@@ -21,11 +23,68 @@ export function HistorialView({
   onOpenPurchase,
   onOpenBoleta,
   onDeletePurchase,
+  onCloseCycle,
 }: HistorialViewProps) {
   const cyclePurchases = purchases.filter((p) => p.purchased_at >= cycleStart);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  const handleConfirmClose = async () => {
+    setClosing(true);
+    try {
+      await onCloseCycle();
+      setConfirmOpen(false);
+    } finally {
+      setClosing(false);
+    }
+  };
 
   return (
     <div className="p-8">
+      {confirmOpen && (
+        <>
+          <div
+            onClick={() => !closing && setConfirmOpen(false)}
+            className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
+          />
+          <div className="fixed top-1/2 left-1/2 z-201 w-[min(420px,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+                <AlertTriangle
+                  className="h-5 w-5 text-amber-500"
+                  strokeWidth={2}
+                />
+              </div>
+              <div>
+                <h2 className="text-text-primary text-base font-bold">
+                  Cerrar mes
+                </h2>
+                <p className="text-text-secondary mt-1 text-sm">
+                  Se iniciará un nuevo ciclo: el presupuesto vuelve a cero, se
+                  reinician los productos ya comprados y se vacía el stock de la
+                  despensa. El historial de compras se conserva.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                disabled={closing}
+                className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmClose}
+                disabled={closing}
+                className="bg-button-primary cursor-pointer rounded-xl px-4 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+              >
+                {closing ? "Cerrando…" : "Cerrar mes"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-text-primary text-2xl font-bold">
@@ -34,6 +93,13 @@ export function HistorialView({
           <p className="text-text-secondary mt-1 text-sm">Desde {cycleStart}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setConfirmOpen(true)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-100"
+          >
+            <CalendarCheck className="h-4 w-4" strokeWidth={1.75} />
+            Cerrar mes
+          </button>
           <button
             onClick={onOpenAnalysis}
             className="border-border-default bg-bg-card text-text-primary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"

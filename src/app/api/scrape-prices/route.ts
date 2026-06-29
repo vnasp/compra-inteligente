@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  JUMBO_UA,
+  buildSearchQueries,
+  extractCandidates as extractJumboCandidates,
+} from "@/utils/jumbo";
 
 interface ScrapeItem {
   id: string;
@@ -25,26 +30,11 @@ interface CandidateProduct {
   price: number;
 }
 
-function stripSizeFromText(text: string): string {
-  return text
-    .replace(/\b\d+[\.,]?\d*\s*(g|kg|ml|l|cc|cl|un\.?|lt)\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function extractCandidates(html: string): CandidateProduct[] {
-  const candidateRegex =
-    /([^"]*?)"\s+data-cnstrc-item-id="[^"]*"\s+data-cnstrc-item-price="(\d+)"/g;
-  const candidates: CandidateProduct[] = [];
-  let match;
-  while ((match = candidateRegex.exec(html)) !== null) {
-    const title = match[1].toLowerCase();
-    const price = parseInt(match[2], 10);
-    if (price >= 100 && price <= 500000) {
-      candidates.push({ title, price });
-    }
-  }
-  return candidates;
+  return extractJumboCandidates(html).map((c) => ({
+    title: c.name.toLowerCase(),
+    price: c.price,
+  }));
 }
 
 function extractPrice(
@@ -125,7 +115,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (items.length > 50) {
+    if (items.length > 80) {
       return NextResponse.json(
         { error: "Máximo 50 productos por solicitud" },
         { status: 400 },
@@ -137,8 +127,7 @@ export async function POST(request: NextRequest) {
 
     const fetchHtml = async (url: string): Promise<string | null> => {
       const headers: Record<string, string> = {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": JUMBO_UA,
         Accept: "text/html,application/xhtml+xml",
         "Accept-Language": "es-CL,es;q=0.9",
       };
@@ -159,64 +148,27 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const brandParam = item.brand
-        ? `&b=${encodeURIComponent(item.brand)}`
-        : "";
 
-      // Strip brand from name (brand already goes in &b= filter).
-      // Leaving it in ft= causes 0 results when brand has special chars (e.g. "Cuisine & Co").
-      const nameNoBrand = item.brand
-        ? item.name
-            .replace(
-              new RegExp(
-                item.brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-                "i",
-              ),
-              "",
-            )
-            .replace(/\s+/g, " ")
-            .trim()
-        : item.name;
-
-      // Extra size from package fields (only if not already embedded in name)
-      const sizePart =
-        item.package_size &&
-        !nameNoBrand.toLowerCase().includes(String(item.package_size))
-          ? `${item.package_size} ${item.package_unit ?? ""}`.trim()
-          : "";
-
-      const ftWithSize = `${nameNoBrand} ${sizePart}`.trim();
-      const ftClean = stripSizeFromText(nameNoBrand); // strip sizes embedded in name text
-
-      // Build ordered query list: with brand first, then without brand as fallback.
-      // Deduplicated so we never make the same request twice.
-      const seenQueries = new Set<string>();
-      const queries: Array<[ft: string, bParam: string]> = [];
-      for (const ft of [...new Set([ftWithSize, ftClean])]) {
-        for (const b of brandParam ? [brandParam, ""] : [""]) {
-          const key = ft + b;
-          if (!seenQueries.has(key)) {
-            seenQueries.add(key);
-            queries.push([ft, b]);
-          }
-        }
-      }
+      // Lista ordenada de queries: con marca primero, sin marca como fallback.
+      const queries = buildSearchQueries(item);
+      // Nombre usado para el scoring (primer query = nombre + tamaño, sin marca).
+      const matchName = queries[0]?.ft ?? item.name;
 
       console.log(
-        `[scrape-prices] searching: "${ftWithSize}" brand="${item.brand}"`,
+        `[scrape-prices] searching: "${matchName}" brand="${item.brand}"`,
       );
 
       try {
         let candidates: CandidateProduct[] = [];
 
         for (let q = 0; q < queries.length; q++) {
-          const [ft, b] = queries[q];
-          const url = `https://www.jumbo.cl/busqueda?ft=${encodeURIComponent(ft)}${b}`;
+          const { ft, bParam } = queries[q];
+          const url = `https://www.jumbo.cl/busqueda?ft=${encodeURIComponent(ft)}${bParam}`;
           const html = await fetchHtml(url);
           if (html) {
             candidates = extractCandidates(html);
             console.log(
-              `[scrape-prices] ft="${ft}" b="${b ? item.brand : "none"}" html:${html.length} candidates:${candidates.length}`,
+              `[scrape-prices] ft="${ft}" b="${bParam ? item.brand : "none"}" html:${html.length} candidates:${candidates.length}`,
             );
           }
           if (candidates.length > 0) break;
@@ -225,7 +177,7 @@ export async function POST(request: NextRequest) {
 
         const price = extractPrice(
           candidates,
-          ftWithSize,
+          matchName,
           item.brand,
           item.package_size,
           item.package_unit,

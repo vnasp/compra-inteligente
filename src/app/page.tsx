@@ -20,6 +20,7 @@ import type {
   ShoppingListItem,
   UserConfig,
   Purchase,
+  PurchaseItem,
   PriceHistorySummary,
 } from "@/types/shopping";
 
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const [scraping, setScraping] = useState(false);
   const [scrapeMsg, setScrapeMsg] = useState("");
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [boletaOpen, setBoletaOpen] = useState(false);
   const [barcodeMappings, setBarcodeMappings] = useState<
@@ -113,6 +115,28 @@ export default function Dashboard() {
     load();
   }, []);
 
+  // Cargar unidades compradas por producto (últimos 45 días, cubre el ciclo)
+  useEffect(() => {
+    const load = async () => {
+      const { createClient } = await import("@/utils/supabase/client");
+      const supabase = createClient();
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 45);
+      const cutoffStr = [
+        cutoff.getFullYear(),
+        String(cutoff.getMonth() + 1).padStart(2, "0"),
+        String(cutoff.getDate()).padStart(2, "0"),
+      ].join("-");
+      const { data, error } = await supabase
+        .from("pantry_purchase_items")
+        .select("*")
+        .gte("purchased_at", cutoffStr);
+      if (error) console.error("Error cargando items comprados:", error);
+      if (data) setPurchaseItems(data as PurchaseItem[]);
+    };
+    load();
+  }, []);
+
   // Cargar mapeos de códigos de barras
   useEffect(() => {
     const load = async () => {
@@ -157,26 +181,37 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Inicio del ciclo actual: día de compra más cercano anterior al día 1 del mes
-  const cycleStart = (() => {
-    const weekday = config?.shopping_weekday ?? 4;
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const daysSince = (firstOfMonth.getDay() - weekday + 7) % 7;
-    const start = new Date(firstOfMonth);
-    start.setDate(1 - daysSince);
-    return [
-      start.getFullYear(),
-      String(start.getMonth() + 1).padStart(2, "0"),
-      String(start.getDate()).padStart(2, "0"),
-    ].join("-");
-  })();
+  // Inicio del ciclo actual: cycle_start manual si existe; si no, el día de
+  // compra más cercano anterior al día 1 del mes (cálculo automático).
+  const cycleStart =
+    config?.cycle_start ??
+    (() => {
+      const weekday = config?.shopping_weekday ?? 4;
+      const now = new Date();
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const daysSince = (firstOfMonth.getDay() - weekday + 7) % 7;
+      const start = new Date(firstOfMonth);
+      start.setDate(1 - daysSince);
+      return [
+        start.getFullYear(),
+        String(start.getMonth() + 1).padStart(2, "0"),
+        String(start.getDate()).padStart(2, "0"),
+      ].join("-");
+    })();
 
   const monthSpent = purchases
     .filter((p) => p.purchased_at >= cycleStart)
     .reduce((s, p) => s + p.amount, 0);
   const monthlyBudget = config?.monthly_budget ?? 0;
   const remainingBudget = monthlyBudget - monthSpent;
+
+  // Unidades ya compradas por producto en el ciclo actual (item_id → qty)
+  const boughtThisCycle = purchaseItems
+    .filter((pi) => pi.purchased_at >= cycleStart)
+    .reduce<Record<string, number>>((acc, pi) => {
+      acc[pi.item_id] = (acc[pi.item_id] ?? 0) + pi.quantity;
+      return acc;
+    }, {});
 
   const handleStockUpdate = async (id: string, level: number) => {
     setStockLevels((prev) => ({ ...prev, [id]: level }));
@@ -199,7 +234,10 @@ export default function Dashboard() {
 
   const handleScrape = async () => {
     const toBuy = items.filter(
-      (i) => i.is_active && suggestedQty(i, stockLevels[i.id] ?? null) > 0,
+      (i) =>
+        i.is_active &&
+        suggestedQty(i, stockLevels[i.id] ?? null, boughtThisCycle[i.id] ?? 0) >
+          0,
     );
     if (toBuy.length === 0) return;
     setScraping(true);
@@ -303,9 +341,51 @@ export default function Dashboard() {
       stockLevels,
       suggestedQty,
       formatQty,
+      boughtThisCycle,
     );
     const result = solveKnapsack(knapsackItems, remainingBudget);
     setKnapsackResult(result);
+  };
+
+  // Cerrar mes: inicia un nuevo ciclo. Reinicia presupuesto, contadores de
+  // comprado (vía cycle_start) y vacía el stock de la despensa.
+  const handleCloseCycle = async () => {
+    const today = toISO(new Date());
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
+    if (config) {
+      const { data } = await supabase
+        .from("pantry_user_config")
+        .update({ cycle_start: today, updated_at: new Date().toISOString() })
+        .eq("id", config.id)
+        .select()
+        .single();
+      if (data) setConfig(data as UserConfig);
+    }
+    await handleClearAllStock();
+    setKnapsackResult(null);
+  };
+
+  // Marcar productos de la lista óptima como comprados (registra unidades).
+  const handleMarkPurchased = async (
+    rows: { item_id: string; quantity: number }[],
+  ) => {
+    if (rows.length === 0) return;
+    const purchasedAt = toISO(new Date());
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("pantry_purchase_items")
+      .insert(
+        rows.map((r) => ({
+          item_id: r.item_id,
+          quantity: r.quantity,
+          purchased_at: purchasedAt,
+        })),
+      )
+      .select();
+    if (data)
+      setPurchaseItems((prev) => [...(data as PurchaseItem[]), ...prev]);
   };
 
   const handleShareWhatsApp = (result: KnapsackResult) => {
@@ -494,6 +574,7 @@ export default function Dashboard() {
           <OptimizacionView
             items={items}
             stockLevels={stockLevels}
+            boughtThisCycle={boughtThisCycle}
             knapsackResult={knapsackResult}
             priceHistory={priceHistory}
             scraping={scraping}
@@ -503,6 +584,7 @@ export default function Dashboard() {
             onScrape={handleScrape}
             onGenerateOptimal={handleGenerateOptimal}
             onShareWhatsApp={handleShareWhatsApp}
+            onMarkPurchased={handleMarkPurchased}
             onOpenList={() => setActiveView("mi-lista")}
           />
         )}
@@ -524,6 +606,7 @@ export default function Dashboard() {
             onOpenPurchase={() => setPurchaseOpen(true)}
             onOpenBoleta={() => setBoletaOpen(true)}
             onDeletePurchase={handleDeletePurchase}
+            onCloseCycle={handleCloseCycle}
           />
         )}
       </main>

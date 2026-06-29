@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import { Search, Link2, X, Check } from "lucide-react";
 import type { ShoppingListItem, Unit } from "@/types/shopping";
 import {
   CATEGORIES,
@@ -10,6 +12,9 @@ import {
   type FormState,
 } from "./constants";
 import { Toggle } from "./Toggle";
+import { formatPrice } from "@/utils/stock";
+import type { JumboCandidate } from "@/utils/jumbo";
+import { useToast } from "@/components/ui/Toast";
 
 export function FormView({
   initial,
@@ -20,6 +25,7 @@ export function FormView({
   onSave: (form: FormState) => void;
   onCancel: () => void;
 }) {
+  const toast = useToast();
   const [form, setForm] = useState<FormState>(
     initial
       ? {
@@ -35,9 +41,56 @@ export function FormView({
           is_active: initial.is_active,
           is_required: initial.is_required ?? true,
           notes: initial.notes ?? "",
+          jumbo_sku: initial.jumbo_sku ?? null,
+          jumbo_name: initial.jumbo_name ?? null,
         }
       : EMPTY_FORM,
   );
+
+  // ── Vínculo con Jumbo ──
+  const [jumboOpen, setJumboOpen] = useState(false);
+  const [jumboQuery, setJumboQuery] = useState("");
+  const [jumboLoading, setJumboLoading] = useState(false);
+  const [jumboResults, setJumboResults] = useState<JumboCandidate[]>([]);
+  const [jumboSearched, setJumboSearched] = useState(false);
+
+  const openJumboSearch = () => {
+    const size = form.package_size
+      ? ` ${form.package_size} ${form.package_unit}`
+      : "";
+    setJumboQuery(`${form.name} ${form.brand}${size}`.trim());
+    setJumboResults([]);
+    setJumboSearched(false);
+    setJumboOpen(true);
+  };
+
+  const runJumboSearch = async () => {
+    const q = jumboQuery.trim();
+    if (!q) return;
+    setJumboLoading(true);
+    setJumboSearched(true);
+    try {
+      const res = await fetch(`/api/jumbo-search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error consultando Jumbo");
+      setJumboResults((data.results ?? []) as JumboCandidate[]);
+    } catch (err) {
+      setJumboResults([]);
+      toast.error(
+        err instanceof Error ? err.message : "Error consultando Jumbo",
+      );
+    } finally {
+      setJumboLoading(false);
+    }
+  };
+
+  const linkJumbo = (c: JumboCandidate) => {
+    setForm((f) => ({ ...f, jumbo_sku: c.sku, jumbo_name: c.name }));
+    setJumboOpen(false);
+  };
+
+  const unlinkJumbo = () =>
+    setForm((f) => ({ ...f, jumbo_sku: null, jumbo_name: null }));
 
   const inputClass =
     "w-full px-3 py-2.5 rounded-xl border-[1.5px] border-border-soft bg-bg-soft text-sm text-text-primary outline-none box-border focus:border-greenCustom-400";
@@ -220,6 +273,137 @@ export function FormView({
             checked={form.is_active}
             onChange={(v) => setForm({ ...form, is_active: v })}
           />
+        </div>
+
+        {/* Vínculo con Jumbo */}
+        <div>
+          <label className={labelClass}>Vínculo con Jumbo</label>
+          {form.jumbo_sku ? (
+            <div className="border-greenCustom-200 bg-greenCustom-50 flex items-center gap-2 rounded-xl border-[1.5px] px-3 py-2.5">
+              <Check
+                className="text-greenCustom-600 h-4 w-4 shrink-0"
+                strokeWidth={2.5}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-greenCustom-800 truncate text-xs font-semibold">
+                  {form.jumbo_name}
+                </p>
+                <p className="text-greenCustom-600 text-[10px]">
+                  SKU {form.jumbo_sku}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openJumboSearch}
+                className="text-greenCustom-700 hover:bg-greenCustom-100 cursor-pointer rounded-lg px-2 py-1 text-[11px] font-semibold"
+              >
+                Cambiar
+              </button>
+              <button
+                type="button"
+                onClick={unlinkJumbo}
+                title="Quitar vínculo"
+                className="text-text-muted hover:bg-greenCustom-100 cursor-pointer rounded-lg p-1"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : jumboOpen ? (
+            <div className="border-border-soft bg-bg-soft flex flex-col gap-2 rounded-xl border-[1.5px] p-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search
+                    className="text-text-muted absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
+                    strokeWidth={1.75}
+                  />
+                  <input
+                    autoFocus
+                    className={`${inputClass} py-2 pl-8 text-xs`}
+                    value={jumboQuery}
+                    onChange={(e) => setJumboQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runJumboSearch();
+                      }
+                      if (e.key === "Escape") setJumboOpen(false);
+                    }}
+                    placeholder="Buscar en Jumbo…"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={runJumboSearch}
+                  disabled={jumboLoading}
+                  className="bg-greenCustom-700 hover:bg-greenCustom-800 shrink-0 cursor-pointer rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {jumboLoading ? "…" : "Buscar"}
+                </button>
+              </div>
+
+              {jumboResults.length > 0 && (
+                <div className="border-border-soft max-h-64 overflow-y-auto rounded-lg border bg-white">
+                  {jumboResults.map((c) => (
+                    <button
+                      type="button"
+                      key={c.sku}
+                      onClick={() => linkJumbo(c)}
+                      className="border-border-soft hover:bg-greenCustom-50 flex w-full cursor-pointer items-center gap-2.5 border-b px-2.5 py-2 text-left last:border-0"
+                    >
+                      {c.image ? (
+                        <Image
+                          src={c.image}
+                          alt=""
+                          width={36}
+                          height={36}
+                          unoptimized
+                          className="h-9 w-9 shrink-0 rounded-md object-contain"
+                        />
+                      ) : (
+                        <div className="bg-bg-soft h-9 w-9 shrink-0 rounded-md" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-text-primary truncate text-xs font-medium">
+                          {c.name}
+                        </p>
+                        <p className="text-text-muted text-[10px]">
+                          SKU {c.sku}
+                        </p>
+                      </div>
+                      <span className="text-text-primary shrink-0 text-xs font-bold">
+                        {formatPrice(c.price)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {jumboSearched && !jumboLoading && jumboResults.length === 0 && (
+                <p className="text-text-muted py-2 text-center text-[11px]">
+                  Sin resultados en Jumbo. Ajusta la búsqueda.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setJumboOpen(false)}
+                className="text-text-muted hover:text-text-primary cursor-pointer text-[11px] font-semibold"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openJumboSearch}
+              className="border-border-soft bg-bg-card text-text-secondary hover:border-greenCustom-300 hover:text-greenCustom-700 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2.5 text-sm font-semibold transition-colors"
+            >
+              <Link2 className="h-4 w-4" strokeWidth={1.75} /> Buscar en Jumbo
+            </button>
+          )}
+          <p className="text-text-muted mt-1 mb-0 text-[11px]">
+            Vincula el producto para poder llenar el carro de Jumbo con un clic.
+          </p>
         </div>
 
         {/* Buttons */}

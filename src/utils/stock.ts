@@ -41,9 +41,13 @@ export function getStockConfig(level: number) {
 export function suggestedQty(
   item: ShoppingListItem,
   level: number | null,
+  bought = 0,
 ): number {
-  if (level === null) return Math.ceil(item.quantity);
-  return Math.ceil(item.quantity * (1 - level / 100));
+  // Descontamos lo ya comprado este ciclo de la cantidad mensual.
+  const remaining = Math.max(0, item.quantity - bought);
+  if (remaining === 0) return 0;
+  if (level === null) return Math.ceil(remaining);
+  return Math.ceil(remaining * (1 - level / 100));
 }
 
 export function formatQty(item: ShoppingListItem, qty: number): string {

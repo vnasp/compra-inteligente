@@ -5,6 +5,7 @@ import { Pencil, Trash2, Tag, X, StickyNote, Search } from "lucide-react";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { FormView } from "@/components/shopping-list/FormView";
 import { Toggle } from "@/components/shopping-list/Toggle";
+import { useToast } from "@/components/ui/Toast";
 import {
   CATEGORIES,
   CATEGORY_META,
@@ -19,8 +20,10 @@ interface MiListaViewProps {
 }
 
 export function MiListaView({ items, setItems }: MiListaViewProps) {
+  const toast = useToast();
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [editing, setEditing] = useState<ShoppingListItem | null>(null);
+  const [formResetKey, setFormResetKey] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState("Despensa");
   const [noteId, setNoteId] = useState<string | null>(null);
@@ -157,33 +160,46 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
       is_active: form.is_active,
       is_required: form.is_required,
       notes: form.notes || null,
+      jumbo_sku: form.jumbo_sku,
+      jumbo_name: form.jumbo_name,
       updated_at: new Date().toISOString(),
     };
 
-    if (editing) {
-      const { data } = await supabase
-        .from("pantry_shopping_list_items")
-        .update(payload)
-        .eq("id", editing.id)
-        .select()
-        .single();
-      if (data) {
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === editing.id ? (data as ShoppingListItem) : i,
-          ),
-        );
-        setEditing(null);
+    try {
+      if (editing) {
+        const { data, error } = await supabase
+          .from("pantry_shopping_list_items")
+          .update(payload)
+          .eq("id", editing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === editing.id ? (data as ShoppingListItem) : i,
+            ),
+          );
+          setEditing(null);
+          toast.success("Cambios guardados");
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("pantry_shopping_list_items")
+          .insert({ ...payload, created_at: new Date().toISOString() })
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setItems((prev) => [data as ShoppingListItem, ...prev]);
+          setFormResetKey((k) => k + 1);
+          toast.success("Producto agregado");
+        }
       }
-    } else {
-      const { data } = await supabase
-        .from("pantry_shopping_list_items")
-        .insert({ ...payload, created_at: new Date().toISOString() })
-        .select()
-        .single();
-      if (data) {
-        setItems((prev) => [data as ShoppingListItem, ...prev]);
-      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo guardar el producto",
+      );
     }
   };
 
@@ -456,7 +472,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
       {/* ── Right: always-visible form ── */}
       <div className="border-border-soft bg-bg-card w-80 shrink-0 overflow-y-auto border-l">
         <FormView
-          key={editing?.id ?? "new"}
+          key={editing?.id ?? `new-${formResetKey}`}
           initial={editing}
           onSave={handleSave}
           onCancel={handleNew}

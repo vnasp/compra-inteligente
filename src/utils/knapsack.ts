@@ -112,15 +112,30 @@ export function solveKnapsack(
 export function buildKnapsackItems(
   items: ShoppingListItem[],
   stockLevels: Record<string, number>,
-  suggestedQtyFn: (item: ShoppingListItem, level: number | null) => number,
+  suggestedQtyFn: (
+    item: ShoppingListItem,
+    level: number | null,
+    bought?: number,
+  ) => number,
   formatQtyFn: (item: ShoppingListItem, qty: number) => string,
+  boughtThisCycle: Record<string, number> = {},
 ): KnapsackItem[] {
   return items
     .filter(
-      (i) => i.is_active && suggestedQtyFn(i, stockLevels[i.id] ?? null) > 0,
+      (i) =>
+        i.is_active &&
+        suggestedQtyFn(
+          i,
+          stockLevels[i.id] ?? null,
+          boughtThisCycle[i.id] ?? 0,
+        ) > 0,
     )
     .map((i) => {
-      const qty = suggestedQtyFn(i, stockLevels[i.id] ?? null);
+      const qty = suggestedQtyFn(
+        i,
+        stockLevels[i.id] ?? null,
+        boughtThisCycle[i.id] ?? 0,
+      );
       const unitCost = i.last_price ?? null;
       return {
         id: i.id,

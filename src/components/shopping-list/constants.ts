@@ -62,6 +62,8 @@ export interface FormState {
   is_active: boolean;
   is_required: boolean;
   notes: string;
+  jumbo_sku: string | null;
+  jumbo_name: string | null;
 }
 
 export const EMPTY_FORM: FormState = {
@@ -76,4 +78,6 @@ export const EMPTY_FORM: FormState = {
   is_active: true,
   is_required: true,
   notes: "",
+  jumbo_sku: null,
+  jumbo_name: null,
 };

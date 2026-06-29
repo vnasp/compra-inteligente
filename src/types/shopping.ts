@@ -16,6 +16,10 @@ export interface ShoppingListItem {
   supermarket: string;
   last_price: number | null; // precio en CLP, sin decimales
   price_updated_at: string | null; // ISO timestamp
+  /** SKU del producto en Jumbo (VTEX), para armar el carro online */
+  jumbo_sku: string | null;
+  /** Nombre del producto en Jumbo, para mostrar el vínculo */
+  jumbo_name: string | null;
   is_active: boolean;
   /** true = siempre se compra; false = solo si queda presupuesto */
   is_required: boolean;
@@ -37,6 +41,8 @@ export interface UserConfig {
   shopping_days: number[];
   shopping_weekday: number; // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
   supermarkets: string[];
+  /** Inicio del ciclo activo. Si es null, se calcula automáticamente. */
+  cycle_start: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,5 +60,14 @@ export interface Purchase {
   supermarket: string;
   purchased_at: string;
   tag: string | null;
+  created_at: string;
+}
+
+// ── Unidades compradas por producto (para no re-sugerir en el ciclo) ─────
+export interface PurchaseItem {
+  id: string;
+  item_id: string;
+  quantity: number;
+  purchased_at: string;
   created_at: string;
 }
