@@ -365,7 +365,11 @@ function cartIIFE(
   const loadItems = listUrl
     ? `await (async () => {
     const r = await fetch("${listUrl}", { cache: "no-store" });
-    if (!r.ok) throw new Error("no se pudo leer la lista (" + r.status + ")");
+    if (!r.ok) {
+      // El endpoint explica la causa (ej. falta la migración); mostrarla.
+      const detalle = await r.json().then((d) => d.error).catch(() => null);
+      throw new Error(detalle || "no se pudo leer la lista (" + r.status + ")");
+    }
     const d = await r.json();
     if (!d.items || !d.items.length) throw new Error("la lista está vacía: genera la lista óptima en la app");
     return d.items;

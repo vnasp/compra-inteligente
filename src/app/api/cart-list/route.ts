@@ -45,6 +45,17 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
+    // PGRST205 = la tabla no existe. Es el error esperable si falta correr la
+    // migración, así que se dice explícitamente en vez de un 500 mudo.
+    if (error?.code === "PGRST205") {
+      return NextResponse.json(
+        {
+          error:
+            "Falta la tabla pantry_cart_snapshot: aplica la migración 20260730010000_cart_snapshot.sql en Supabase.",
+        },
+        { status: 503, headers: corsHeaders() },
+      );
+    }
     if (error) throw error;
 
     return NextResponse.json(
