@@ -304,34 +304,23 @@ const CART_TOKEN_KEY = "sessionDataToken";
 const CART_API_KEY = "be-reg-groceries-jumbo-cart-rhk68rqi0adn";
 const CART_CLIENT_VERSION = "1.2.14";
 
+/** Nombre sugerido para el marcador */
+export const CART_BOOKMARK_NAME = "🛒 Llenar carro";
+
 /**
- * Genera el snippet que llena el carro del supermercado. Se pega en la consola
- * de su sitio con la sesión abierta. Ver el bloque de arriba para por qué esto
- * no puede correr dentro de la app.
+ * Bookmarklet que llena el carro del supermercado. Se guarda **una vez** como
+ * URL de un marcador y se ejecuta con un click estando en su sitio, sin abrir
+ * la consola. Ver el bloque de arriba para por qué esto no puede correr dentro
+ * de la app.
+ *
+ * La lista no va incrustada: la pide a `/api/cart-list` (la última guardada al
+ * abrir el modal del carro), así que el marcador no hay que rehacerlo nunca
+ * salvo que cambie el dominio de la app.
  *
  * Camino normal: lee el token de localStorage y manda la lista en tandas, sin
  * intervención. Si el BFF responde 401/403 (apiKey o versión de cliente
  * rotadas), instala un interceptor, pide interactuar con el carro una vez,
  * toma prestados los headers reales y reintenta la tanda que falló.
- */
-export function buildCartSnippet(
-  rows: Array<{ sku: string; qty: number }>,
-): string {
-  return `/* Compra Inteligente · llenar carro
-   1. Abre el sitio del supermercado con tu sesión iniciada
-   2. Pega esto en la consola y listo (si pide ayuda, abre el carro una vez) */
-${cartIIFE(rows)};`;
-}
-
-/** Nombre sugerido para el marcador */
-export const CART_BOOKMARK_NAME = "🛒 Llenar carro";
-
-/**
- * El mismo flujo como bookmarklet: se guarda **una vez** como URL de un marcador
- * y se ejecuta con un click estando en el sitio del supermercado, sin abrir la
- * consola. A diferencia del snippet, la lista no va incrustada: la pide a
- * `/api/cart-list` (la última guardada al generar la lista óptima), así que el
- * marcador no hay que rehacerlo nunca.
  *
  * `appOrigin` debe ser **https** — desde el sitio del supermercado, que es
  * https, el navegador bloquea pedir a `http://` por contenido mixto. O sea que
@@ -345,25 +334,13 @@ export function buildCartBookmarklet(
   token?: string,
 ): string {
   const url = `${appOrigin.replace(/\/$/, "")}/api/cart-list${token ? `?k=${encodeURIComponent(token)}` : ""}`;
-  const code = `void((async()=>{try{alert(await ${cartIIFE(null, url)})}catch(e){alert("Compra Inteligente · error: "+e.message)}})());`;
+  const code = `void((async()=>{try{alert(await ${cartIIFE(url)})}catch(e){alert("Compra Inteligente · error: "+e.message)}})());`;
   return `javascript:${encodeURIComponent(code)}`;
 }
 
-/**
- * Cuerpo compartido: IIFE que devuelve el resumen como string.
- * Con `rows` la lista va incrustada (snippet de consola); con `listUrl` se pide
- * en caliente (bookmarklet permanente).
- */
-function cartIIFE(
-  rows: Array<{ sku: string; qty: number }> | null,
-  listUrl?: string,
-): string {
-  const items = (rows ?? [])
-    .filter((r) => r.sku && r.qty > 0)
-    .map((r) => ({ skuId: r.sku, quantity: r.qty }));
-
-  const loadItems = listUrl
-    ? `await (async () => {
+/** IIFE que pide la lista, la manda al BFF y devuelve el resumen como string. */
+function cartIIFE(listUrl: string): string {
+  const loadItems = `await (async () => {
     const r = await fetch("${listUrl}", { cache: "no-store" });
     if (!r.ok) {
       // El endpoint explica la causa (ej. falta la migración); mostrarla.
@@ -373,8 +350,7 @@ function cartIIFE(
     const d = await r.json();
     if (!d.items || !d.items.length) throw new Error("la lista está vacía: genera la lista óptima en la app");
     return d.items;
-  })()`
-    : JSON.stringify(items);
+  })()`;
 
   return `(async () => {
   const ITEMS = ${loadItems};
@@ -449,6 +425,6 @@ function cartIIFE(
     console.log(\`tanda \${Math.floor(i / ${CART_CHUNK}) + 1}: \${res.status} · \${ok}/\${ITEMS.length}\`);
     await new Promise((r) => setTimeout(r, ${CART_CHUNK_PAUSE_MS}));
   }
-  return \`\${ok} de \${ITEMS.length} productos agregados\` + (fails.length ? \` · errores: \${fails.join(" | ")}\` : "") + " · revisa tu carro";
+  return \`\${ok} de \${ITEMS.length} productos agregados\` + (fails.length ? \` · errores: \${fails.join(" | ")}\` : "") + " · actualiza la página y luego revisa tu carro";
 })()`;
 }

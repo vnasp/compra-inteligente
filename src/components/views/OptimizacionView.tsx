@@ -8,19 +8,13 @@ import {
   ShoppingCart,
   ExternalLink,
   Check,
-  Copy,
   Bookmark,
-  Terminal,
   X,
 } from "lucide-react";
 import { CATEGORY_META } from "@/components/shopping-list/constants";
 import { suggestedQty, formatPrice } from "@/utils/stock";
 import type { KnapsackItem, KnapsackResult } from "@/utils/knapsack";
-import {
-  buildCartSnippet,
-  buildCartBookmarklet,
-  CART_BOOKMARK_NAME,
-} from "@/utils/jumbo";
+import { buildCartBookmarklet, CART_BOOKMARK_NAME } from "@/utils/jumbo";
 import type { ShoppingListItem, PriceHistorySummary } from "@/types/shopping";
 import { useToast } from "@/components/ui/Toast";
 
@@ -147,10 +141,9 @@ export function OptimizacionView({
 
   // ── Llenar carro en Supermercado ──
   const [cartWarnOpen, setCartWarnOpen] = useState(false);
-  // Instrucciones + snippet para pegar en la consola de Jumbo (ver utils/jumbo:
-  // el deep link de VTEX murió y el BFF solo acepta llamadas desde su origen).
+  // Instrucciones + marcador para llenar el carro (ver utils/jumbo: el deep link
+  // de VTEX murió y el BFF solo acepta llamadas desde el origen del super).
   const [cartHelpOpen, setCartHelpOpen] = useState(false);
-  const [snippetCopied, setSnippetCopied] = useState(false);
   const [bookmarkletCopied, setBookmarkletCopied] = useState(false);
   const [snapshotSaved, setSnapshotSaved] = useState(false);
   // El marcador permanente solo sirve sobre https: desde el sitio del
@@ -452,41 +445,6 @@ export function OptimizacionView({
                 )}
               </div>
 
-              {/* ── Alternativa: pegar en consola ── */}
-              <div className="border-border-soft mt-3 rounded-xl border p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <Terminal
-                    className="text-text-muted h-4 w-4 shrink-0"
-                    strokeWidth={2}
-                  />
-                  <h3 className="text-text-primary text-sm font-bold">
-                    Código para la consola
-                  </h3>
-                </div>
-                <ol className="text-text-secondary flex list-decimal flex-col gap-1.5 pl-4 text-[13px] leading-snug">
-                  <li>
-                    Copia el código: lleva tus {linkedRows.length} productos
-                    dentro.
-                  </li>
-                  <li>
-                    Abre{" "}
-                    <a
-                      href="https://www.jumbo.cl"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-greenCustom-700 font-semibold underline"
-                    >
-                      el sitio del supermercado
-                    </a>{" "}
-                    con tu sesión iniciada y tu tienda seleccionada.
-                  </li>
-                  <li>
-                    Abre la consola (⌥⌘C), pega y Enter. Si el código lo pide,
-                    abre el carro una vez.
-                  </li>
-                </ol>
-              </div>
-
               <p className="text-text-muted mt-4 text-[11px] leading-snug">
                 Tus datos de sesión no salen de la pestaña del supermercado: el
                 código los usa ahí mismo. Esta app solo aporta la lista de
@@ -501,22 +459,6 @@ export function OptimizacionView({
                 className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
               >
                 Cerrar
-              </button>
-              <button
-                onClick={() =>
-                  copy(buildCartSnippet(linkedRows), setSnippetCopied)
-                }
-                className="border-border-default bg-bg-card text-text-primary hover:bg-bg-soft flex cursor-pointer items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
-              >
-                {snippetCopied ? (
-                  <>
-                    <Check className="h-4 w-4" strokeWidth={2.5} /> Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" strokeWidth={2} /> Copiar código
-                  </>
-                )}
               </button>
               {canUseBookmarklet && (
                 <button
