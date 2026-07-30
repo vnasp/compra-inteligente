@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, Tag, X, StickyNote, Search } from "lucide-react";
+import { Pencil, Trash2, Tag, X, Search } from "lucide-react";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { FormView } from "@/components/shopping-list/FormView";
-import { Toggle } from "@/components/shopping-list/Toggle";
+import { useToast } from "@/components/ui/Toast";
 import {
   CATEGORIES,
   CATEGORY_META,
@@ -19,12 +19,12 @@ interface MiListaViewProps {
 }
 
 export function MiListaView({ items, setItems }: MiListaViewProps) {
+  const toast = useToast();
   const [activeCategory, setActiveCategory] = useState("Todos");
   const [editing, setEditing] = useState<ShoppingListItem | null>(null);
+  const [formResetKey, setFormResetKey] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState("Despensa");
-  const [noteId, setNoteId] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState("");
   const [search, setSearch] = useState("");
 
   const sorted = sortByCategory(items);
@@ -38,7 +38,6 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
           i.name.toLowerCase().includes(search.toLowerCase()),
         )
       : byCategory;
-  const activeCount = items.filter((i) => i.is_active).length;
 
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
@@ -73,28 +72,6 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const openNote = (item: ShoppingListItem) => {
-    setNoteId(item.id);
-    setNoteText(item.notes ?? "");
-  };
-  const closeNote = () => {
-    setNoteId(null);
-    setNoteText("");
-  };
-  const saveNote = async (id: string) => {
-    const value = noteText.trim() || null;
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, notes: value } : i)),
-    );
-    closeNote();
-    const { createClient } = await import("@/utils/supabase/client");
-    const supabase = createClient();
-    await supabase
-      .from("pantry_shopping_list_items")
-      .update({ notes: value, updated_at: new Date().toISOString() })
-      .eq("id", id);
-  };
-
   const handleBulkCategoryChange = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -115,15 +92,15 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
   const handleNew = () => setEditing(null);
   const handleEdit = (item: ShoppingListItem) => setEditing(item);
 
-  const handleToggleActive = async (id: string, val: boolean) => {
+  const handleToggleRequired = async (id: string, val: boolean) => {
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, is_active: val } : i)),
+      prev.map((i) => (i.id === id ? { ...i, is_required: val } : i)),
     );
     const { createClient } = await import("@/utils/supabase/client");
     const supabase = createClient();
     await supabase
       .from("pantry_shopping_list_items")
-      .update({ is_active: val, updated_at: new Date().toISOString() })
+      .update({ is_required: val, updated_at: new Date().toISOString() })
       .eq("id", id);
   };
 
@@ -145,7 +122,6 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
     const supabase = createClient();
     const payload = {
       name: form.name,
-      brand: form.brand || null,
       category: form.category,
       quantity: parseFloat(form.quantity) || 1,
       unit: form.unit,
@@ -153,37 +129,55 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
         ? parseFloat(form.package_size.replace(",", "."))
         : null,
       package_unit: form.package_size ? form.package_unit : null,
-      supermarket: form.supermarket,
-      is_active: form.is_active,
       is_required: form.is_required,
-      notes: form.notes || null,
+      jumbo_sku: form.jumbo_sku,
+      jumbo_name: form.jumbo_name,
+      last_price: form.last_price,
+      price_updated_at: form.price_updated_at,
       updated_at: new Date().toISOString(),
     };
 
-    if (editing) {
-      const { data } = await supabase
-        .from("pantry_shopping_list_items")
-        .update(payload)
-        .eq("id", editing.id)
-        .select()
-        .single();
-      if (data) {
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === editing.id ? (data as ShoppingListItem) : i,
-          ),
-        );
-        setEditing(null);
+    try {
+      if (editing) {
+        const { data, error } = await supabase
+          .from("pantry_shopping_list_items")
+          .update(payload)
+          .eq("id", editing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === editing.id ? (data as ShoppingListItem) : i,
+            ),
+          );
+          setEditing(null);
+          toast.success("Cambios guardados");
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("pantry_shopping_list_items")
+          .insert({ ...payload, created_at: new Date().toISOString() })
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setItems((prev) => [data as ShoppingListItem, ...prev]);
+          setFormResetKey((k) => k + 1);
+          toast.success("Producto agregado");
+        }
       }
-    } else {
-      const { data } = await supabase
-        .from("pantry_shopping_list_items")
-        .insert({ ...payload, created_at: new Date().toISOString() })
-        .select()
-        .single();
-      if (data) {
-        setItems((prev) => [data as ShoppingListItem, ...prev]);
-      }
+    } catch (err) {
+      // Los errores de Supabase son PostgrestError (objeto con `message`), no
+      // instancias de Error, por eso los desempaquetamos explícitamente.
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "No se pudo guardar el producto";
+      toast.error(msg);
     }
   };
 
@@ -197,9 +191,9 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
             <h1 className="text-text-primary text-2xl font-bold">Mi Lista</h1>
             <p className="text-text-secondary mt-1 text-sm">
               <span className="text-text-primary font-semibold">
-                {activeCount} activos
+                {items.length}
               </span>{" "}
-              de {items.length} productos
+              {items.length === 1 ? "producto" : "productos"}
             </p>
           </div>
         </div>
@@ -300,21 +294,16 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                   CATEGORY_META[item.category] ?? CATEGORY_META["Despensa"];
                 const isEditing = editing?.id === item.id;
                 const isChecked = selectedIds.has(item.id);
-                const isNoteOpen = noteId === item.id;
                 return (
                   <div key={item.id}>
                     {/* Main row */}
                     <div
                       className={`border-border-soft flex items-center gap-3 border-b px-4 py-3 transition-colors ${
-                        isNoteOpen ? "border-b-0" : ""
-                      } ${
                         isChecked
                           ? "bg-greenCustom-50"
                           : isEditing
                             ? "bg-bg-soft"
-                            : !item.is_active
-                              ? "opacity-50"
-                              : ""
+                            : ""
                       }`}
                     >
                       {/* Checkbox */}
@@ -339,51 +328,32 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                           {item.name}
                         </p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                          {item.brand && (
-                            <span className="text-text-muted text-xs">
-                              {item.brand}
-                            </span>
-                          )}
                           <span className="bg-bg-soft text-text-secondary rounded-full px-2 py-0.5 text-[10px] font-medium">
                             {item.package_size
                               ? `${item.quantity} × ${item.package_size} ${item.package_unit}`
                               : `${item.quantity} ${item.unit}`}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              item.is_required
-                                ? "bg-tag-essential-bg text-tag-essential-text"
-                                : "bg-bg-soft text-text-muted"
-                            }`}
-                          >
-                            {item.is_required ? "Requerido" : "Opcional"}
                           </span>
                         </div>
                       </div>
 
                       {/* Actions */}
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <Toggle
-                          checked={item.is_active}
-                          onChange={(v) => handleToggleActive(item.id, v)}
-                        />
                         <button
                           onClick={() =>
-                            isNoteOpen ? closeNote() : openNote(item)
+                            handleToggleRequired(item.id, !item.is_required)
                           }
-                          title={item.notes ? "Ver nota" : "Agregar nota"}
-                          className={`cursor-pointer rounded-lg p-1.5 transition-colors ${
-                            item.notes
-                              ? "text-amber-500 hover:bg-amber-50"
-                              : isNoteOpen
-                                ? "bg-amber-100 text-amber-600"
-                                : "text-text-muted hover:bg-bg-soft hover:text-amber-500"
+                          title={
+                            item.is_required
+                              ? "Requerido — click para hacerlo opcional"
+                              : "Opcional — click para hacerlo requerido"
+                          }
+                          className={`cursor-pointer rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                            item.is_required
+                              ? "bg-tag-essential-bg text-tag-essential-text hover:opacity-80"
+                              : "bg-bg-soft text-text-muted hover:text-text-primary"
                           }`}
                         >
-                          <StickyNote
-                            className="h-3.5 w-3.5"
-                            strokeWidth={1.75}
-                          />
+                          {item.is_required ? "Requerido" : "Opcional"}
                         </button>
                         <button
                           onClick={() =>
@@ -407,44 +377,6 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                         </button>
                       </div>
                     </div>
-
-                    {/* Inline note panel */}
-                    {isNoteOpen && (
-                      <div className="border-border-soft border-b bg-amber-50/60 px-4 pt-2 pb-3">
-                        <textarea
-                          autoFocus
-                          rows={2}
-                          value={noteText}
-                          onChange={(e) => setNoteText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") closeNote();
-                            if (e.key === "Enter" && e.metaKey)
-                              saveNote(item.id);
-                          }}
-                          placeholder="Escribe una nota para este producto..."
-                          className="text-text-primary placeholder:text-text-muted w-full resize-none rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400"
-                        />
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="text-text-muted text-[10px]">
-                            ⌘↵ para guardar · Esc para cerrar
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={closeNote}
-                              className="text-text-muted hover:text-text-primary cursor-pointer rounded-lg px-3 py-1 text-xs transition-colors"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              onClick={() => saveNote(item.id)}
-                              className="cursor-pointer rounded-lg bg-amber-500 px-3 py-1 text-xs font-bold text-white transition-all hover:opacity-90"
-                            >
-                              Guardar
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -454,9 +386,9 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
       </div>
 
       {/* ── Right: always-visible form ── */}
-      <div className="border-border-soft bg-bg-card w-80 shrink-0 overflow-y-auto border-l">
+      <div className="border-border-soft bg-bg-card my-8 mr-8 w-80 shrink-0 overflow-y-auto rounded-2xl border">
         <FormView
-          key={editing?.id ?? "new"}
+          key={editing?.id ?? `new-${formResetKey}`}
           initial={editing}
           onSave={handleSave}
           onCancel={handleNew}

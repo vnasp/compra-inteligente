@@ -1,6 +1,6 @@
 "use client";
 
-import { CATEGORY_META } from "@/components/ShoppingListPanel";
+import { CATEGORY_META } from "@/components/shopping-list/constants";
 import { formatPrice } from "@/utils/stock";
 import type { ShoppingListItem } from "@/types/shopping";
 import type { KnapsackResult } from "@/utils/knapsack";

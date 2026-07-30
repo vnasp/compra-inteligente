@@ -10,10 +10,9 @@ El proyecto nació como una solución personal para reducir tiempo de planificac
 - Presupuesto mensual configurable
 - Optimización automática de compras
 - Web scraping de precios desde supermercado
-- Integración de boletas mediante carga manual
-- Matching automático por código de barras
+- Registro manual de compras del mes
 - Compartir lista optimizada vía WhatsApp
-- Programación inteligente de próximas compras
+- Días de compra marcados en un calendario mensual
 - Integración con Google Calendar
 
 ## Cómo funciona
@@ -78,7 +77,6 @@ Sistema personal en desarrollo continuo, utilizado para la gestión y optimizaci
 
 ## Roadmap
 
-- OCR para procesamiento automático de boletas
 - Comparación multi-supermercado
 - Predicción de consumo
 - Recomendaciones inteligentes

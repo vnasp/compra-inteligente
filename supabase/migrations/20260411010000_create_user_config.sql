@@ -28,4 +28,4 @@ create trigger user_config_updated_at
 
 -- Insertar configuración por defecto
 insert into public.user_config (monthly_budget, shopping_days, supermarkets)
-values (150000, '{1, 15}', '{"Lider", "Jumbo"}');
+values (150000, '{1, 15}', '{"Lider", "Supermercado"}');

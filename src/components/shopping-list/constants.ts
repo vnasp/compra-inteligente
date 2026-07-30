@@ -52,28 +52,31 @@ export function sortByCategory<T extends { category: string }>(
 
 export interface FormState {
   name: string;
-  brand: string;
   category: string;
   quantity: string;
   unit: Unit;
   package_size: string;
   package_unit: Unit;
-  supermarket: string;
-  is_active: boolean;
   is_required: boolean;
-  notes: string;
+  jumbo_sku: string | null;
+  jumbo_name: string | null;
+  /** Imagen del producto en Supermercado — transitoria, solo para la vista previa. */
+  jumbo_image: string | null;
+  last_price: number | null;
+  price_updated_at: string | null;
 }
 
 export const EMPTY_FORM: FormState = {
   name: "",
-  brand: "",
   category: "Despensa",
   quantity: "1",
   unit: "un",
   package_size: "",
   package_unit: "g",
-  supermarket: "Lider",
-  is_active: true,
   is_required: true,
-  notes: "",
+  jumbo_sku: null,
+  jumbo_name: null,
+  jumbo_image: null,
+  last_price: null,
+  price_updated_at: null,
 };

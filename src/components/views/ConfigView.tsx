@@ -1,33 +1,45 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CalendarPlus,
+  Trash2,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import {
+  toISO,
+  formatLongDate,
+  monthGrid,
+  nextShoppingDate,
+  openGoogleCalendar,
+} from "@/utils/dates";
 import type { UserConfig } from "@/types/shopping";
 
 const DEFAULT_CONFIG = {
   monthly_budget: 150000,
-  shopping_days: [1, 15],
-  shopping_weekday: 4,
-  supermarkets: ["Jumbo"],
+  shopping_dates: [] as string[],
+  supermarkets: ["Supermercado"],
 };
 
-const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-const SHOPPING_PRESETS = [
-  { key: "mensual", label: "Mensual", days: [1] },
-  { key: "quincenal", label: "Quincenal", days: [1, 15] },
-  { key: "custom", label: "Personalizado", days: null },
-] as const;
-
-type ShoppingPreset = (typeof SHOPPING_PRESETS)[number]["key"];
-
-function detectPreset(days: number[]): ShoppingPreset {
-  const sorted = [...days].sort((a, b) => a - b).join(",");
-  if (sorted === "1") return "mensual";
-  if (sorted === "1,15") return "quincenal";
-  return "custom";
-}
+const MONTH_NAMES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
 
 interface ConfigViewProps {
   config: UserConfig | null;
@@ -36,36 +48,51 @@ interface ConfigViewProps {
 
 export function ConfigView({ config, setConfig }: ConfigViewProps) {
   const [budget, setBudget] = useState("");
-  const [daysInput, setDaysInput] = useState("");
-  const [weekday, setWeekday] = useState(4);
-  const [daysPreset, setDaysPreset] = useState<ShoppingPreset>("quincenal");
+  const [dates, setDates] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Mes visible en el calendario (se fija en el cliente para evitar hydration mismatch)
+  const [cursor, setCursor] = useState<{ year: number; month: number } | null>(
+    null,
+  );
+  const [todayISO, setTodayISO] = useState("");
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    const now = new Date();
+    setCursor({ year: now.getFullYear(), month: now.getMonth() });
+    setTodayISO(toISO(now));
+  }, []);
+
+  useEffect(() => {
     const src = config ?? DEFAULT_CONFIG;
     setBudget(String(src.monthly_budget));
-    const days = src.shopping_days ?? DEFAULT_CONFIG.shopping_days;
-    setDaysInput(days.join(", "));
-    setDaysPreset(detectPreset(days));
-    setWeekday(src.shopping_weekday ?? 4);
+    setDates([...(src.shopping_dates ?? [])].sort());
   }, [config]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  const toggleDate = (iso: string) => {
+    setDates((prev) =>
+      prev.includes(iso)
+        ? prev.filter((d) => d !== iso)
+        : [...prev, iso].sort(),
+    );
+  };
+
+  const shiftMonth = (delta: number) => {
+    setCursor((prev) => {
+      if (!prev) return prev;
+      const d = new Date(prev.year, prev.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    const parsedDays = daysInput
-      .split(",")
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => !isNaN(n) && n >= 1 && n <= 31)
-      .sort((a, b) => a - b);
-
     const payload = {
       monthly_budget: parseInt(budget, 10) || DEFAULT_CONFIG.monthly_budget,
-      shopping_days: parsedDays.length > 0 ? parsedDays : [1],
-      shopping_weekday: weekday,
-      supermarkets: ["Jumbo"],
+      shopping_dates: [...dates].sort(),
+      supermarkets: ["Supermercado"],
       updated_at: new Date().toISOString(),
     };
 
@@ -97,12 +124,16 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
   const labelClass = "mb-1.5 block text-sm font-semibold text-text-primary";
   const hintClass = "mt-1 text-xs text-text-muted";
 
+  const upcoming = todayISO ? dates.filter((d) => d >= todayISO) : dates;
+  const nextDate = todayISO ? nextShoppingDate(dates, new Date()) : null;
+  const weeks = cursor ? monthGrid(cursor.year, cursor.month) : [];
+
   return (
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-text-primary text-2xl font-bold">Configuración</h1>
         <p className="text-text-secondary mt-1 text-sm">
-          Ajusta el presupuesto y el ciclo de compra
+          Ajusta el presupuesto y marca los días en que harás la compra
         </p>
       </div>
 
@@ -127,69 +158,81 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
             <p className={hintClass}>Total destinado a compras del mes</p>
           </div>
 
-          {/* Frecuencia */}
+          {/* Calendario de compras */}
           <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
-            <h2 className="text-text-primary mb-4 text-sm font-bold">
-              Frecuencia de compra
-            </h2>
-            <label className={labelClass}>Ciclo</label>
-            <div className="flex gap-2">
-              {SHOPPING_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  onClick={() => {
-                    setDaysPreset(preset.key);
-                    if (preset.days) setDaysInput(preset.days.join(", "));
-                  }}
-                  className={`flex-1 cursor-pointer rounded-xl border py-2.5 text-xs font-semibold transition-all ${
-                    daysPreset === preset.key
-                      ? "border-greenCustom-600 bg-greenCustom-700 text-white"
-                      : "border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300"
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-text-primary text-sm font-bold">
+                Días de compra
+              </h2>
+              {cursor && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => shiftMonth(-1)}
+                    title="Mes anterior"
+                    className="border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300 hover:text-greenCustom-700 cursor-pointer rounded-lg border p-1.5 transition-all"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+                  <span className="text-text-primary w-36 text-center text-xs font-semibold capitalize">
+                    {MONTH_NAMES[cursor.month]} {cursor.year}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => shiftMonth(1)}
+                    title="Mes siguiente"
+                    className="border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300 hover:text-greenCustom-700 cursor-pointer rounded-lg border p-1.5 transition-all"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+                </div>
+              )}
             </div>
-            {daysPreset === "custom" && (
-              <input
-                type="text"
-                value={daysInput}
-                onChange={(e) => setDaysInput(e.target.value)}
-                className={`mt-3 ${inputClass}`}
-                placeholder="1, 8, 22"
-              />
-            )}
-            <p className={hintClass}>
-              La fecha exacta se ajusta al {WEEKDAYS[weekday]} más cercano a los
-              días de referencia
-            </p>
-          </div>
 
-          {/* Día de compra */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
-            <h2 className="text-text-primary mb-4 text-sm font-bold">
-              Día de compra
-            </h2>
-            <div className="flex gap-1.5">
-              {WEEKDAYS.map((name, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setWeekday(idx)}
-                  className={`flex-1 cursor-pointer rounded-lg border py-2 text-xs font-semibold transition-all ${
-                    weekday === idx
-                      ? "border-greenCustom-600 bg-greenCustom-700 text-white"
-                      : "border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300"
-                  }`}
+            <div className="mb-1.5 grid grid-cols-7 gap-1">
+              {WEEKDAY_LABELS.map((name) => (
+                <span
+                  key={name}
+                  className="text-text-muted text-center text-[11px] font-semibold"
                 >
                   {name}
-                </button>
+                </span>
               ))}
             </div>
+
+            <div className="flex flex-col gap-1">
+              {weeks.map((week, wi) => (
+                <div key={wi} className="grid grid-cols-7 gap-1">
+                  {week.map((iso, di) => {
+                    if (!iso) return <span key={di} />;
+                    const selected = dates.includes(iso);
+                    const isToday = iso === todayISO;
+                    const isPast = todayISO !== "" && iso < todayISO;
+                    return (
+                      <button
+                        key={iso}
+                        type="button"
+                        onClick={() => toggleDate(iso)}
+                        aria-pressed={selected}
+                        className={`cursor-pointer rounded-lg border py-2 text-xs font-semibold transition-all ${
+                          selected
+                            ? "border-greenCustom-600 bg-greenCustom-700 text-white"
+                            : isToday
+                              ? "border-greenCustom-400 bg-bg-soft text-greenCustom-700"
+                              : `border-border-soft bg-bg-soft hover:border-greenCustom-300 ${isPast ? "text-text-muted/60" : "text-text-muted"}`
+                        }`}
+                      >
+                        {parseInt(iso.slice(8), 10)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
             <p className={hintClass}>
-              Día de la semana en que habitualmente compras
+              Marca los días en que irás al supermercado. La próxima compra se
+              sugiere a partir de estas fechas.
             </p>
           </div>
 
@@ -218,6 +261,63 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
 
         {/* ── Right column: info cards ── */}
         <div className="flex flex-col gap-5">
+          {/* Próximas compras */}
+          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+            <h2 className="text-text-primary mb-1 text-sm font-bold">
+              Próximas compras
+            </h2>
+            <p className="text-text-muted mb-4 text-xs">
+              Agrégalas a tu calendario para no olvidarlas
+            </p>
+            {upcoming.length === 0 ? (
+              <p className="text-text-muted py-4 text-center text-xs">
+                Aún no has marcado días de compra
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {upcoming.map((iso) => (
+                  <div
+                    key={iso}
+                    className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${
+                      iso === nextDate
+                        ? "border-greenCustom-200 bg-greenCustom-50"
+                        : "border-border-soft bg-bg-soft"
+                    }`}
+                  >
+                    <div>
+                      <p className="text-text-primary text-sm font-semibold capitalize">
+                        {formatLongDate(iso)}
+                      </p>
+                      {iso === nextDate && (
+                        <p className="text-greenCustom-600 text-xs">
+                          Próxima compra
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openGoogleCalendar(iso)}
+                        title="Agregar al Calendario"
+                        className="border-border-soft bg-bg-card text-text-muted hover:border-greenCustom-200 hover:text-greenCustom-700 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all"
+                      >
+                        <CalendarPlus className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleDate(iso)}
+                        title="Quitar fecha"
+                        className="text-text-muted flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-all hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Supermercado */}
           <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
             <h2 className="text-text-primary mb-1 text-sm font-bold">
@@ -231,7 +331,9 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                 J
               </div>
               <div>
-                <p className="text-greenCustom-800 font-semibold">Jumbo</p>
+                <p className="text-greenCustom-800 font-semibold">
+                  Supermercado
+                </p>
                 <p className="text-greenCustom-600 text-xs">
                   Scraping de precios activo
                 </p>
@@ -251,23 +353,17 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                   value: `$${(parseInt(budget, 10) || 0).toLocaleString("es-CL")}`,
                 },
                 {
-                  label: "Ciclo",
-                  value:
-                    SHOPPING_PRESETS.find((p) => p.key === daysPreset)?.label ??
-                    "—",
+                  label: "Días marcados",
+                  value: String(dates.length),
                 },
                 {
-                  label: "Día de compra",
-                  value: WEEKDAYS[weekday],
-                },
-                {
-                  label: "Días del mes",
-                  value: daysInput || "—",
+                  label: "Próxima compra",
+                  value: nextDate ? formatLongDate(nextDate) : "—",
                 },
               ].map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-text-muted text-xs">{label}</span>
-                  <span className="text-text-primary text-xs font-semibold">
+                  <span className="text-text-primary text-xs font-semibold capitalize">
                     {value}
                   </span>
                 </div>

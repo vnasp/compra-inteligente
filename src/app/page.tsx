@@ -3,12 +3,17 @@
 import { useState, useEffect } from "react";
 import { INITIAL_ITEMS } from "@/components/shopping-list/constants";
 import { MiListaView } from "@/components/views/MiListaView";
-import { BoletaModal } from "@/components/views/BoletaModal";
 import { ConfigView } from "@/components/views/ConfigView";
 import { AddPurchase } from "@/components/AddPurchase";
 import { Sidebar, type AppView } from "@/components/Sidebar";
 import { ShoppingAnalysis } from "@/components/ShoppingAnalysis";
 import { suggestedQty, formatQty, formatPrice } from "@/utils/stock";
+import {
+  toISO,
+  formatLongDate,
+  nextShoppingDate,
+  autoCycleStart,
+} from "@/utils/dates";
 import { solveKnapsack, buildKnapsackItems } from "@/utils/knapsack";
 import type { KnapsackResult } from "@/utils/knapsack";
 import { TopBar } from "@/components/views/TopBar";
@@ -20,23 +25,37 @@ import type {
   ShoppingListItem,
   UserConfig,
   Purchase,
+  PurchaseItem,
   PriceHistorySummary,
 } from "@/types/shopping";
+
+// ── Scraping de precios en tandas ──────────────────────────────────────
+// Productos por request: el route acepta hasta 15 y una tanda de 12 tarda ~14 s
+// (el pacing de ~1 req/s lo aplica utils/jumbo).
+const SCRAPE_BATCH_SIZE = 12;
+// Pausa entre tandas, además del espaciado por request. Súbela (ej. 60_000)
+// si Supermercado empieza a responder 429.
+const SCRAPE_BATCH_PAUSE_MS = 15_000;
+// No se vuelve a pedir un precio scrapeado hace menos de esto: evita repetir
+// trabajo sobre el sitio de Supermercado si se aprieta el botón dos veces.
+const FRESH_PRICE_HOURS = 6;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ── Página principal ───────────────────────────────────────────────────
 export default function Dashboard() {
   const [items, setItems] = useState<ShoppingListItem[]>(INITIAL_ITEMS);
-  const [stockLevels, setStockLevels] = useState<Record<string, number>>({});
+  // item_id → cantidad que queda hoy en la despensa (unidades del producto)
+  const [stockRemaining, setStockRemaining] = useState<Record<string, number>>(
+    {},
+  );
 
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [scraping, setScraping] = useState(false);
   const [scrapeMsg, setScrapeMsg] = useState("");
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
-  const [boletaOpen, setBoletaOpen] = useState(false);
-  const [barcodeMappings, setBarcodeMappings] = useState<
-    Record<string, string>
-  >({});
   const [knapsackResult, setKnapsackResult] = useState<KnapsackResult | null>(
     null,
   );
@@ -73,18 +92,18 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Cargar stock levels desde Supabase al montar
+  // Cargar el stock (cantidad restante) desde Supabase al montar
   useEffect(() => {
     const load = async () => {
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
       const { data } = await supabase.from("pantry_stock_levels").select("*");
       if (data) {
-        const levels: Record<string, number> = {};
+        const remaining: Record<string, number> = {};
         for (const row of data) {
-          levels[row.item_id] = row.level;
+          remaining[row.item_id] = row.remaining;
         }
-        setStockLevels(levels);
+        setStockRemaining(remaining);
       }
     };
     load();
@@ -113,19 +132,24 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Cargar mapeos de códigos de barras
+  // Cargar unidades compradas por producto (últimos 45 días, cubre el ciclo)
   useEffect(() => {
     const load = async () => {
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
-      const { data } = await supabase
-        .from("pantry_barcode_mappings")
-        .select("barcode, item_id");
-      if (data) {
-        const m: Record<string, string> = {};
-        for (const row of data) m[row.barcode] = row.item_id;
-        setBarcodeMappings(m);
-      }
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 45);
+      const cutoffStr = [
+        cutoff.getFullYear(),
+        String(cutoff.getMonth() + 1).padStart(2, "0"),
+        String(cutoff.getDate()).padStart(2, "0"),
+      ].join("-");
+      const { data, error } = await supabase
+        .from("pantry_purchase_items")
+        .select("*")
+        .gte("purchased_at", cutoffStr);
+      if (error) console.error("Error cargando items comprados:", error);
+      if (data) setPurchaseItems(data as PurchaseItem[]);
     };
     load();
   }, []);
@@ -157,20 +181,10 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Inicio del ciclo actual: día de compra más cercano anterior al día 1 del mes
-  const cycleStart = (() => {
-    const weekday = config?.shopping_weekday ?? 4;
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const daysSince = (firstOfMonth.getDay() - weekday + 7) % 7;
-    const start = new Date(firstOfMonth);
-    start.setDate(1 - daysSince);
-    return [
-      start.getFullYear(),
-      String(start.getMonth() + 1).padStart(2, "0"),
-      String(start.getDate()).padStart(2, "0"),
-    ].join("-");
-  })();
+  // Inicio del ciclo actual: cycle_start manual si existe; si no, se deriva de
+  // las fechas de compra marcadas en el calendario (ver utils/dates).
+  const cycleStart =
+    config?.cycle_start ?? autoCycleStart(config?.shopping_dates ?? []);
 
   const monthSpent = purchases
     .filter((p) => p.purchased_at >= cycleStart)
@@ -178,17 +192,25 @@ export default function Dashboard() {
   const monthlyBudget = config?.monthly_budget ?? 0;
   const remainingBudget = monthlyBudget - monthSpent;
 
-  const handleStockUpdate = async (id: string, level: number) => {
-    setStockLevels((prev) => ({ ...prev, [id]: level }));
+  // Unidades ya compradas por producto en el ciclo actual (item_id → qty)
+  const boughtThisCycle = purchaseItems
+    .filter((pi) => pi.purchased_at >= cycleStart)
+    .reduce<Record<string, number>>((acc, pi) => {
+      acc[pi.item_id] = (acc[pi.item_id] ?? 0) + pi.quantity;
+      return acc;
+    }, {});
+
+  const handleStockUpdate = async (id: string, remaining: number) => {
+    setStockRemaining((prev) => ({ ...prev, [id]: remaining }));
     const { createClient } = await import("@/utils/supabase/client");
     const supabase = createClient();
     await supabase
       .from("pantry_stock_levels")
-      .upsert({ item_id: id, level }, { onConflict: "item_id" });
+      .upsert({ item_id: id, remaining }, { onConflict: "item_id" });
   };
 
   const handleClearAllStock = async () => {
-    setStockLevels({});
+    setStockRemaining({});
     const { createClient } = await import("@/utils/supabase/client");
     const supabase = createClient();
     const ids = items.map((i) => i.id);
@@ -197,115 +219,253 @@ export default function Dashboard() {
     }
   };
 
+  // Actualiza los precios de la lista. Se envía en tandas: cada búsqueda en
+  // Supermercado descarga ~1 MB de HTML y va espaciada ~1 s, así que un solo request
+  // con 85 productos se pasaría de cualquier límite. Cada tanda se guarda al
+  // terminar, de modo que un error a mitad de camino no bota lo ya scrapeado.
+  // Se omiten los precios frescos y la corrida se detiene si Supermercado pide esperar.
   const handleScrape = async () => {
-    const toBuy = items.filter(
-      (i) => i.is_active && suggestedQty(i, stockLevels[i.id] ?? null) > 0,
+    if (items.length === 0) return;
+
+    const freshCutoff = Date.now() - FRESH_PRICE_HOURS * 3600_000;
+    const pending = items.filter(
+      (i) =>
+        !i.price_updated_at ||
+        new Date(i.price_updated_at).getTime() < freshCutoff,
     );
-    if (toBuy.length === 0) return;
+    const skipped = items.length - pending.length;
+
+    if (pending.length === 0) {
+      setScrapeMsg(
+        `Todos los precios se actualizaron hace menos de ${FRESH_PRICE_HOURS} h`,
+      );
+      return;
+    }
+
     setScraping(true);
     setScrapeMsg("");
-    try {
-      const payload = {
-        items: toBuy.map((i) => ({
-          id: i.id,
-          name: i.name,
-          brand: i.brand,
-          package_size: i.package_size,
-          package_unit: i.package_unit,
-        })),
-      };
-      const res = await fetch("/api/scrape-prices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al scrapear");
 
-      const { createClient } = await import("@/utils/supabase/client");
-      const supabase = createClient();
-      const now = new Date().toISOString();
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
 
-      // Capturar precios anteriores antes de actualizar (para tendencia)
-      const oldPrices: Record<string, number | null> = {};
-      for (const p of data.prices) {
-        if (p.price) {
-          oldPrices[p.id] =
-            items.find((i) => i.id === p.id)?.last_price ?? null;
-        }
-      }
+    const batches: ShoppingListItem[][] = [];
+    for (let i = 0; i < pending.length; i += SCRAPE_BATCH_SIZE) {
+      batches.push(pending.slice(i, i + SCRAPE_BATCH_SIZE));
+    }
 
-      let updated = 0;
-      const historyRecords: {
-        item_id: string;
-        price: number;
-        supermarket: string;
-        scraped_at: string;
-      }[] = [];
-      for (const p of data.prices) {
-        if (p.price) {
+    // Precio previo por producto, para la tendencia ↑↓ (se actualiza tanda a tanda)
+    const prevPriceById = new Map(pending.map((i) => [i.id, i.last_price]));
+
+    let processed = 0;
+    let updated = 0;
+    let failedBatches = 0;
+    let rateLimited = false;
+
+    const progress = (batchIdx: number) =>
+      setScrapeMsg(
+        `Tanda ${batchIdx + 1}/${batches.length} · ` +
+          `${processed}/${pending.length} productos · ${updated} precios`,
+      );
+
+    for (let b = 0; b < batches.length; b++) {
+      const batch = batches[b];
+      progress(b);
+
+      try {
+        const payload = {
+          items: batch.map((i) => ({
+            id: i.id,
+            name: i.name,
+            package_size: i.package_size,
+            package_unit: i.package_unit,
+            jumbo_sku: i.jumbo_sku,
+          })),
+        };
+        const res = await fetch("/api/scrape-prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error al scrapear");
+
+        const now = new Date().toISOString();
+        const found = (
+          data.prices as { id: string; price: number | null }[]
+        ).filter((p) => p.price);
+
+        for (const p of found) {
           await supabase
             .from("pantry_shopping_list_items")
             .update({ last_price: p.price, price_updated_at: now })
             .eq("id", p.id);
-          historyRecords.push({
-            item_id: p.id,
-            price: p.price,
-            supermarket: "Jumbo",
-            scraped_at: now,
-          });
-          updated++;
         }
-      }
 
-      if (historyRecords.length > 0) {
-        await supabase.from("pantry_price_history").insert(historyRecords);
-        setPriceHistory((prev) => {
-          const next = { ...prev };
-          for (const rec of historyRecords) {
-            const existing = next[rec.item_id];
-            next[rec.item_id] = {
-              prevPrice: oldPrices[rec.item_id] ?? null,
-              minPrice:
-                existing?.minPrice != null
-                  ? Math.min(existing.minPrice, rec.price)
-                  : rec.price,
-            };
-          }
-          return next;
-        });
-      }
-
-      setItems((prev) =>
-        prev.map((item) => {
-          const found = data.prices.find(
-            (p: { id: string; price: number | null }) => p.id === item.id,
+        if (found.length > 0) {
+          await supabase.from("pantry_price_history").insert(
+            found.map((p) => ({
+              item_id: p.id,
+              price: p.price as number,
+              supermarket: "Supermercado",
+              scraped_at: now,
+            })),
           );
-          if (found?.price) {
-            return { ...item, last_price: found.price, price_updated_at: now };
-          }
-          return item;
-        }),
-      );
 
-      setScrapeMsg(`${updated} de ${data.prices.length} precios actualizados`);
-    } catch (err) {
-      setScrapeMsg(err instanceof Error ? err.message : "Error desconocido");
-    } finally {
-      setScraping(false);
+          setPriceHistory((prev) => {
+            const next = { ...prev };
+            for (const p of found) {
+              const price = p.price as number;
+              const existing = next[p.id];
+              next[p.id] = {
+                prevPrice: prevPriceById.get(p.id) ?? null,
+                minPrice:
+                  existing?.minPrice != null
+                    ? Math.min(existing.minPrice, price)
+                    : price,
+              };
+            }
+            return next;
+          });
+
+          setItems((prev) =>
+            prev.map((item) => {
+              const hit = found.find((p) => p.id === item.id);
+              return hit
+                ? {
+                    ...item,
+                    last_price: hit.price as number,
+                    price_updated_at: now,
+                  }
+                : item;
+            }),
+          );
+
+          for (const p of found) prevPriceById.set(p.id, p.price as number);
+          updated += found.length;
+        }
+
+        // Supermercado pidió frenar: se guarda lo obtenido y se corta la corrida.
+        if (data.rateLimited) rateLimited = true;
+      } catch (err) {
+        failedBatches++;
+        console.error(`[scrape] tanda ${b + 1} falló:`, err);
+      }
+
+      processed += batch.length;
+      progress(b);
+
+      if (rateLimited) break;
+
+      // Pausa entre tandas, además del espaciado por request
+      if (b < batches.length - 1) await sleep(SCRAPE_BATCH_PAUSE_MS);
     }
+
+    const notes = [
+      skipped > 0 ? `${skipped} ya estaban frescos` : "",
+      failedBatches > 0 ? `${failedBatches} tanda(s) con error` : "",
+      rateLimited
+        ? "Supermercado pidió esperar: se detuvo la actualización"
+        : "",
+    ].filter(Boolean);
+
+    setScrapeMsg(
+      `${updated} de ${pending.length} precios actualizados` +
+        (notes.length > 0 ? ` · ${notes.join(" · ")}` : ""),
+    );
+    setScraping(false);
   };
 
-  const handleGenerateOptimal = (excluded: Set<string> = new Set()) => {
-    const filtered = items.filter((i) => !excluded.has(i.id));
+  const handleGenerateOptimal = () => {
     const knapsackItems = buildKnapsackItems(
-      filtered,
-      stockLevels,
+      items,
+      stockRemaining,
       suggestedQty,
       formatQty,
+      boughtThisCycle,
     );
     const result = solveKnapsack(knapsackItems, remainingBudget);
     setKnapsackResult(result);
+  };
+
+  // Cerrar mes: inicia un nuevo ciclo. Reinicia presupuesto, contadores de
+  // comprado (vía cycle_start) y vacía el stock de la despensa.
+  const handleCloseCycle = async () => {
+    const today = toISO(new Date());
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
+    if (config) {
+      const { data } = await supabase
+        .from("pantry_user_config")
+        .update({ cycle_start: today, updated_at: new Date().toISOString() })
+        .eq("id", config.id)
+        .select()
+        .single();
+      if (data) setConfig(data as UserConfig);
+    }
+    await handleClearAllStock();
+    setKnapsackResult(null);
+  };
+
+  // Marcar productos de la lista óptima como comprados (registra unidades).
+  const handleMarkPurchased = async (
+    rows: { item_id: string; quantity: number }[],
+  ) => {
+    if (rows.length === 0) return;
+    const purchasedAt = toISO(new Date());
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
+
+    // Unidades por producto (para no re-sugerir en el ciclo).
+    const { data } = await supabase
+      .from("pantry_purchase_items")
+      .insert(
+        rows.map((r) => ({
+          item_id: r.item_id,
+          quantity: r.quantity,
+          purchased_at: purchasedAt,
+        })),
+      )
+      .select();
+    if (data)
+      setPurchaseItems((prev) => [...(data as PurchaseItem[]), ...prev]);
+
+    // Gasto estimado (last_price × cantidad) → descuenta del presupuesto del mes.
+    // Es una estimación; el gasto real se ajusta registrando la compra a mano.
+    const amount = rows.reduce((s, r) => {
+      const it = items.find((i) => i.id === r.item_id);
+      return s + Math.round((it?.last_price ?? 0) * r.quantity);
+    }, 0);
+    if (amount > 0) {
+      const { data: purchase } = await supabase
+        .from("pantry_purchases")
+        .insert({
+          amount,
+          supermarket: "Supermercado",
+          purchased_at: purchasedAt,
+          tag: "Estimado",
+        })
+        .select()
+        .single();
+      if (purchase) setPurchases((prev) => [purchase as Purchase, ...prev]);
+    }
+  };
+
+  // Guarda la lista lista-para-carro; es lo que lee el bookmarklet desde el
+  // sitio del supermercado vía /api/cart-list. Se conserva solo la más reciente.
+  const handleSaveCartSnapshot = async (
+    rows: { skuId: string; quantity: number }[],
+  ) => {
+    if (rows.length === 0) return;
+    const { createClient } = await import("@/utils/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("pantry_cart_snapshot")
+      .insert({ items: rows })
+      .select("id")
+      .single();
+    if (data) {
+      await supabase.from("pantry_cart_snapshot").delete().neq("id", data.id);
+    }
   };
 
   const handleShareWhatsApp = (result: KnapsackResult) => {
@@ -315,7 +475,7 @@ export default function Dashboard() {
       year: "numeric",
     });
     const lines: string[] = [
-      `*Lista Smart Pantry — ${date}*`,
+      `*Lista de Compras — ${date}*`,
       `Presupuesto: ${formatPrice(result.budget)}`,
       ``,
     ];
@@ -323,7 +483,7 @@ export default function Dashboard() {
       lines.push(`*REQUERIDOS*`);
       for (const item of result.required)
         lines.push(
-          `• ${item.name} ${item.brand} — ${item.formatQty}${item.cost ? ` → ${formatPrice(item.cost)}` : ""}`,
+          `• ${item.name} — ${item.formatQty}${item.cost ? ` → ${formatPrice(item.cost)}` : ""}`,
         );
       lines.push(`_Subtotal: ${formatPrice(result.requiredCost)}_`, ``);
     }
@@ -331,7 +491,7 @@ export default function Dashboard() {
       lines.push(`*OPCIONALES*`);
       for (const item of result.included)
         lines.push(
-          `• ${item.name} ${item.brand} — ${item.formatQty}${item.cost ? ` → ${formatPrice(item.cost)}` : ""}`,
+          `• ${item.name} — ${item.formatQty}${item.cost ? ` → ${formatPrice(item.cost)}` : ""}`,
         );
       lines.push(`_Subtotal: ${formatPrice(result.includedCost)}_`, ``);
     }
@@ -351,55 +511,17 @@ export default function Dashboard() {
     const { createClient } = await import("@/utils/supabase/client");
     const supabase = createClient();
     await supabase.from("pantry_purchases").delete().eq("id", id);
-    // pantry_barcode_mappings no tiene FK a purchases — se conserva automáticamente
   };
 
-  const handleBoletaSave = (
-    newMappings: Record<string, string>,
-    purchase: Purchase,
-  ) => {
-    setBarcodeMappings((prev) => ({ ...prev, ...newMappings }));
-    setPurchases((prev) => [purchase, ...prev]);
-  };
-
-  // Calcular próxima fecha de compra (solo client-side para evitar hydration mismatch)
-  const [nextShoppingDate, setNextShoppingDate] = useState("—");
-  const [nextShoppingDateISO, setNextShoppingDateISO] = useState<string | null>(
-    null,
-  );
-
-  const toISO = (d: Date) =>
-    [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, "0"),
-      String(d.getDate()).padStart(2, "0"),
-    ].join("-");
+  // Próxima compra: primera fecha marcada en el calendario que sea >= hoy.
+  // Se resuelve en un efecto (solo client-side) para evitar hydration mismatch.
+  const [nextDate, setNextDate] = useState("—");
+  const [nextDateISO, setNextDateISO] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!config) return;
-    const today = new Date();
-    const shopDay = config.shopping_weekday ?? 4;
-    if (today.getDay() === shopDay) {
-      setNextShoppingDate(
-        today.toLocaleDateString("es-CL", { day: "numeric", month: "long" }),
-      );
-      setNextShoppingDateISO(toISO(today));
-      return;
-    }
-    const currentDay = today.getDate();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    const sorted = [...config.shopping_days].sort((a, b) => a - b);
-    const nextDay = sorted.find((d) => d > currentDay);
-    const target = nextDay
-      ? new Date(currentYear, currentMonth, nextDay)
-      : new Date(currentYear, currentMonth + 1, sorted[0] ?? 1);
-    const daysUntilShopDay = (shopDay - target.getDay() + 7) % 7;
-    target.setDate(target.getDate() + daysUntilShopDay);
-    setNextShoppingDate(
-      target.toLocaleDateString("es-CL", { day: "numeric", month: "long" }),
-    );
-    setNextShoppingDateISO(toISO(target));
+    const upcoming = nextShoppingDate(config?.shopping_dates ?? []);
+    setNextDateISO(upcoming);
+    setNextDate(upcoming ? formatLongDate(upcoming) : "—");
   }, [config]);
 
   const [budgetDisplay, setBudgetDisplay] = useState("—");
@@ -427,14 +549,6 @@ export default function Dashboard() {
 
   return (
     <div className="bg-bg-app flex h-screen overflow-hidden">
-      {boletaOpen && (
-        <BoletaModal
-          items={items}
-          barcodeMappings={barcodeMappings}
-          onSave={handleBoletaSave}
-          onClose={() => setBoletaOpen(false)}
-        />
-      )}
       {purchaseOpen && (
         <AddPurchase
           supermarkets={config?.supermarkets ?? []}
@@ -462,8 +576,8 @@ export default function Dashboard() {
           budgetDisplay={budgetDisplay}
           pctUsed={pctUsed}
           lastScrapeTs={lastScrapeTs}
-          nextShoppingDate={nextShoppingDate}
-          nextShoppingDateISO={nextShoppingDateISO}
+          nextShoppingDate={nextDate}
+          nextShoppingDateISO={nextDateISO}
         />
 
         {activeView === "inicio" && (
@@ -473,7 +587,7 @@ export default function Dashboard() {
             monthlyBudget={monthlyBudget}
             monthSpent={monthSpent}
             cycleStart={cycleStart}
-            nextShoppingDate={nextShoppingDate}
+            nextShoppingDate={nextDate}
             itemCount={items.length}
             items={items}
             onNavigate={setActiveView}
@@ -483,7 +597,7 @@ export default function Dashboard() {
         {activeView === "inventario" && (
           <InventarioView
             items={items}
-            stockLevels={stockLevels}
+            stockRemaining={stockRemaining}
             priceHistory={priceHistory}
             onStockUpdate={handleStockUpdate}
             onClearAll={handleClearAllStock}
@@ -493,16 +607,18 @@ export default function Dashboard() {
         {activeView === "optimizacion" && (
           <OptimizacionView
             items={items}
-            stockLevels={stockLevels}
+            stockRemaining={stockRemaining}
+            boughtThisCycle={boughtThisCycle}
             knapsackResult={knapsackResult}
             priceHistory={priceHistory}
             scraping={scraping}
             scrapeMsg={scrapeMsg}
-            monthlyBudget={monthlyBudget}
             lastScrapeTs={lastScrapeTs}
             onScrape={handleScrape}
             onGenerateOptimal={handleGenerateOptimal}
             onShareWhatsApp={handleShareWhatsApp}
+            onMarkPurchased={handleMarkPurchased}
+            onSaveCartSnapshot={handleSaveCartSnapshot}
             onOpenList={() => setActiveView("mi-lista")}
           />
         )}
@@ -522,8 +638,8 @@ export default function Dashboard() {
             monthSpent={monthSpent}
             onOpenAnalysis={() => setAnalisisOpen(true)}
             onOpenPurchase={() => setPurchaseOpen(true)}
-            onOpenBoleta={() => setBoletaOpen(true)}
             onDeletePurchase={handleDeletePurchase}
+            onCloseCycle={handleCloseCycle}
           />
         )}
       </main>
