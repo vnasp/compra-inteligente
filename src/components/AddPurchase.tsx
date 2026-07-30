@@ -5,7 +5,7 @@ import type { Purchase } from "@/types/shopping";
 
 const SUPERMARKET_OPTIONS = [
   "Lider",
-  "Jumbo",
+  "Supermercado",
   "Santa Isabel",
   "Tottus",
   "Unimarc",

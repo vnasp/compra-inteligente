@@ -85,7 +85,8 @@ export function Sidebar({
             className="aspect-square"
           />
           <p className="text-greenCustom-700 text-xs leading-snug">
-            Optimizamos tu presupuesto para que lleves más de lo que necesitas.
+            Optimizamos tu presupuesto para que cubras lo que necesitas sin
+            pasarte.
           </p>
         </div>
       </div>

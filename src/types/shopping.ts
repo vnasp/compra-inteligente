@@ -3,7 +3,6 @@ export type Unit = "un" | "kg" | "L" | "g" | "ml";
 export interface ShoppingListItem {
   id: string;
   name: string;
-  brand: string;
   category: string;
   /** Cuántos envases/unidades comprar (ej. 2) */
   quantity: number;
@@ -13,13 +12,14 @@ export interface ShoppingListItem {
   package_size: number | null;
   /** Unidad del tamaño de envase (ej. "g") */
   package_unit: Unit | null;
-  supermarket: string;
   last_price: number | null; // precio en CLP, sin decimales
   price_updated_at: string | null; // ISO timestamp
-  is_active: boolean;
+  /** SKU del producto en Supermercado (VTEX), para armar el carro online */
+  jumbo_sku: string | null;
+  /** Nombre del producto en Supermercado, para mostrar el vínculo */
+  jumbo_name: string | null;
   /** true = siempre se compra; false = solo si queda presupuesto */
   is_required: boolean;
-  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,9 +34,11 @@ export type NewShoppingListItem = Omit<
 export interface UserConfig {
   id: string;
   monthly_budget: number;
-  shopping_days: number[];
-  shopping_weekday: number; // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  /** Fechas de compra marcadas en el calendario, ISO "YYYY-MM-DD" */
+  shopping_dates: string[];
   supermarkets: string[];
+  /** Inicio del ciclo activo. Si es null, se calcula automáticamente. */
+  cycle_start: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,5 +56,14 @@ export interface Purchase {
   supermarket: string;
   purchased_at: string;
   tag: string | null;
+  created_at: string;
+}
+
+// ── Unidades compradas por producto (para no re-sugerir en el ciclo) ─────
+export interface PurchaseItem {
+  id: string;
+  item_id: string;
+  quantity: number;
+  purchased_at: string;
   created_at: string;
 }

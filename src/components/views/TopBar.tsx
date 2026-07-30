@@ -1,6 +1,7 @@
 "use client";
 
 import { Wallet, CircleCheck, CalendarPlus } from "lucide-react";
+import { openGoogleCalendar } from "@/utils/dates";
 
 interface TopBarProps {
   remainingBudget: number;
@@ -17,31 +18,6 @@ function timeAgo(iso: string): string {
   if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
   return `hace ${Math.floor(diff / 86400)} días`;
-}
-
-function openGoogleCalendar(dateISO: string) {
-  const d = new Date(dateISO + "T00:00:00");
-  const next = new Date(d);
-  next.setDate(next.getDate() + 1);
-
-  const fmt = (dt: Date) =>
-    [
-      dt.getFullYear(),
-      String(dt.getMonth() + 1).padStart(2, "0"),
-      String(dt.getDate()).padStart(2, "0"),
-    ].join("");
-
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: "🛒 Compra del mes — Smart Pantry",
-    dates: `${fmt(d)}/${fmt(next)}`,
-    details: "Compra mensual generada por Smart Pantry.",
-  });
-
-  window.open(
-    `https://calendar.google.com/calendar/render?${params}`,
-    "_blank",
-  );
 }
 
 export function TopBar({
@@ -78,7 +54,7 @@ export function TopBar({
         </p>
         <div className="bg-border-soft h-2 w-full overflow-hidden rounded-full">
           <div
-            className={`h-full rounded-full transition-all ${pctUsed >= 100 ? "bg-danger" : pctUsed >= 80 ? "bg-warning" : "bg-greenCustom-700"}`}
+            className={`h-full rounded-full transition-all ${pctUsed >= 100 ? "bg-danger" : pctUsed >= 80 ? "bg-warning" : "bg-success"}`}
             style={{ width: `${pctUsed}%` }}
           />
         </div>
@@ -96,7 +72,7 @@ export function TopBar({
           <p className="text-text-muted text-xs">Último scraping</p>
           <p className="text-text-primary text-sm font-medium">
             {lastScrapeTs
-              ? `Jumbo · ${timeAgo(lastScrapeTs)}`
+              ? `Supermercado · ${timeAgo(lastScrapeTs)}`
               : "Sin datos aún"}
           </p>
         </div>
