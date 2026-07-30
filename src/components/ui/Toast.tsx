@@ -92,13 +92,13 @@ function ToastRow({
       role="status"
       className={`pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 shadow-lg ${
         isSuccess
-          ? "border-greenCustom-200 bg-greenCustom-50 text-greenCustom-800"
+          ? "border-success-border bg-success-bg text-success"
           : "border-red-200 bg-red-50 text-red-700"
       }`}
     >
       {isSuccess ? (
         <CheckCircle2
-          className="text-greenCustom-600 h-5 w-5 shrink-0"
+          className="text-success h-5 w-5 shrink-0"
           strokeWidth={2}
         />
       ) : (

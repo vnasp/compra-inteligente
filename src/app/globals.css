@@ -2,30 +2,36 @@
 
 @theme {
   /* Backgrounds */
-  --color-bg-app: #f6f3ed;
-  --color-bg-surface: #fffdf9;
-  --color-bg-soft: #f0ece3;
+  --color-bg-app: #f5f5f5;
+  --color-bg-surface: #fafafa;
+  --color-bg-soft: #eeeeee;
   --color-bg-card: #ffffff;
 
-  /* Primary greenCustoms */
-  --color-greenCustom-900: #0e5a37;
-  --color-greenCustom-800: #146b43;
-  --color-greenCustom-700: #1d7a4e;
-  --color-greenCustom-600: #2d9363;
-  --color-greenCustom-500: #46a36f;
-  --color-greenCustom-400: #7bbc8c;
-  --color-greenCustom-300: #a9d3b0;
-  --color-greenCustom-200: #d8e9da;
-  --color-greenCustom-100: #edf5ee;
+  /* Primary brand ramp — burdeo/vino (antes verde; se cambió para no imitar el
+     branding de Supermercado, el super que scrapeamos). El nombre del token se mantiene
+     por compatibilidad con las clases existentes. */
+  --color-greenCustom-900: #45111f;
+  --color-greenCustom-800: #5c1729;
+  --color-greenCustom-700: #7a2038;
+  --color-greenCustom-600: #963049;
+  --color-greenCustom-500: #b34761;
+  --color-greenCustom-400: #c9738a;
+  --color-greenCustom-300: #dda3b3;
+  --color-greenCustom-200: #eecdd6;
+  --color-greenCustom-100: #f9eef1;
+  --color-greenCustom-50: #fcf6f8;
 
-  /* Accent / Warm */
-  --color-accent-beige: #e8ddcc;
-  --color-accent-sand: #dccbb3;
-  --color-accent-cream: #f8f4ec;
+  /* Accent / Neutral */
+  --color-accent-beige: #e5e5e5;
+  --color-accent-sand: #d4d4d4;
+  --color-accent-cream: #f5f5f5;
   --color-accent-gold-soft: #c9a86a;
 
-  /* Semantic */
+  /* Semantic — success sigue siendo verde a propósito: "positivo/ahorro/sano"
+     debe leerse distinto del coral de marca y del rojo/ámbar de alerta. */
   --color-success: #2d9363;
+  --color-success-bg: #e7f1ea;
+  --color-success-border: #b9dbc7;
   --color-warning: #d89b4d;
   --color-danger: #d96c6c;
   --color-info: #6a8da8;
@@ -37,13 +43,13 @@
   --color-text-inverse: #ffffff;
 
   /* Borders */
-  --color-border-soft: #e7e1d7;
-  --color-border-default: #d9d2c6;
+  --color-border-soft: #e5e5e5;
+  --color-border-default: #d4d4d4;
 
   /* Buttons */
-  --color-button-primary: #146b43;
-  --color-button-primary-hover: #0e5a37;
-  --color-button-secondary: #edf5ee;
+  --color-button-primary: #7a2038;
+  --color-button-primary-hover: #5c1729;
+  --color-button-secondary: #f9eef1;
 
   /* Tags */
   --color-tag-essential-bg: #fce8e6;

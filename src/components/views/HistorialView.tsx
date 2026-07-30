@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Trash2, CalendarCheck, AlertTriangle } from "lucide-react";
+import { Trash2, CalendarCheck, AlertTriangle } from "lucide-react";
 import type { Purchase } from "@/types/shopping";
 
 interface HistorialViewProps {
@@ -10,7 +10,6 @@ interface HistorialViewProps {
   monthSpent: number;
   onOpenAnalysis: () => void;
   onOpenPurchase: () => void;
-  onOpenBoleta: () => void;
   onDeletePurchase: (id: string) => void;
   onCloseCycle: () => void | Promise<void>;
 }
@@ -21,7 +20,6 @@ export function HistorialView({
   monthSpent,
   onOpenAnalysis,
   onOpenPurchase,
-  onOpenBoleta,
   onDeletePurchase,
   onCloseCycle,
 }: HistorialViewProps) {
@@ -107,13 +105,6 @@ export function HistorialView({
             Análisis
           </button>
           <button
-            onClick={onOpenBoleta}
-            className="border-border-default bg-bg-card text-text-primary hover:bg-bg-soft flex cursor-pointer items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
-          >
-            <FileText className="h-4 w-4" strokeWidth={1.75} />
-            Subir boleta
-          </button>
-          <button
             onClick={onOpenPurchase}
             className="bg-button-primary cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:opacity-90"
           >
@@ -138,7 +129,7 @@ export function HistorialView({
               >
                 <div className="flex items-center gap-4">
                   <div className="bg-greenCustom-100 flex h-10 w-10 items-center justify-center rounded-xl text-base">
-                    {p.tag === "Boleta" ? "🧾" : "🛒"}
+                    🛒
                   </div>
                   <div>
                     <p className="text-text-primary font-semibold">
@@ -166,11 +157,7 @@ export function HistorialView({
                   <div className="relative">
                     <button
                       onClick={() => onDeletePurchase(p.id)}
-                      title={
-                        p.tag === "Boleta"
-                          ? "Eliminar compra (los códigos de barra se conservan)"
-                          : "Eliminar compra"
-                      }
+                      title="Eliminar compra"
                       className="text-text-muted cursor-pointer rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />

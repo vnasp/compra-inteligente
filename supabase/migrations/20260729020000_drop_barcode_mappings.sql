@@ -1,10 +1,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Vínculo de cada producto con su equivalente en Supermercado (VTEX).
--- jumbo_sku: skuId de VTEX, usado para armar el deep link de carrito
---   (/checkout/cart/add?sku=...). jumbo_name: nombre del producto en Supermercado,
---   para mostrar el vínculo confirmado en la UI.
+-- Elimina el soporte de subida de boletas.
+-- La app ya no parsea PDFs de boleta ni mapea códigos de barra a productos:
+-- el gasto se registra manualmente o como estimación al marcar como comprado.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-alter table public.pantry_shopping_list_items
-  add column jumbo_sku  text,
-  add column jumbo_name text;
+drop table if exists public.pantry_barcode_mappings;

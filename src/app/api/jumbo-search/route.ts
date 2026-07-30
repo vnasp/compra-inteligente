@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  JUMBO_UA,
+  buildSearchUrl,
   extractCandidates,
+  fetchJumboHtml,
+  JumboRateLimitError,
   stripSizeFromText,
   type JumboCandidate,
 } from "@/utils/jumbo";
@@ -9,18 +11,8 @@ import {
 const MAX_RESULTS = 12;
 
 async function fetchSearch(query: string): Promise<JumboCandidate[]> {
-  const url = `https://www.jumbo.cl/busqueda?ft=${encodeURIComponent(query)}`;
-  const res = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      "User-Agent": JUMBO_UA,
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "es-CL,es;q=0.9",
-    },
-  });
-  if (!res.ok) return [];
-  const html = await res.text();
-  return extractCandidates(html);
+  const html = await fetchJumboHtml(buildSearchUrl(query));
+  return html ? extractCandidates(html) : [];
 }
 
 export async function GET(request: NextRequest) {
@@ -40,9 +32,23 @@ export async function GET(request: NextRequest) {
       if (stripped && stripped !== q) results = await fetchSearch(stripped);
     }
     return NextResponse.json({ results: results.slice(0, MAX_RESULTS) });
-  } catch {
+  } catch (err) {
+    if (err instanceof JumboRateLimitError) {
+      return NextResponse.json(
+        {
+          error:
+            "Supermercado pidió esperar un momento. Intenta de nuevo en un rato.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(err.retryAfterMs / 1000)),
+          },
+        },
+      );
+    }
     return NextResponse.json(
-      { error: "Error consultando Jumbo" },
+      { error: "Error consultando Supermercado" },
       { status: 502 },
     );
   }

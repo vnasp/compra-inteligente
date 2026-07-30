@@ -1,38 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import {
   CircleCheck,
-  Zap,
-  ShoppingBasket,
-  BadgeCheck,
   RefreshCw,
   Sparkles as SparklesIcon,
   ShoppingCart,
   ExternalLink,
+  Check,
+  Copy,
+  Bookmark,
+  Terminal,
   X,
 } from "lucide-react";
-import { CATEGORY_META, sortByCategory } from "@/components/ShoppingListPanel";
-import {
-  suggestedQty,
-  formatQty,
-  formatPrice,
-  STOCK_LEVELS,
-} from "@/utils/stock";
-import { solveKnapsack, buildKnapsackItems } from "@/utils/knapsack";
+import { CATEGORY_META } from "@/components/shopping-list/constants";
+import { suggestedQty, formatPrice } from "@/utils/stock";
 import type { KnapsackItem, KnapsackResult } from "@/utils/knapsack";
-import { buildJumboCartUrl } from "@/utils/jumbo";
+import {
+  buildCartSnippet,
+  buildCartBookmarklet,
+  CART_BOOKMARK_NAME,
+} from "@/utils/jumbo";
 import type { ShoppingListItem, PriceHistorySummary } from "@/types/shopping";
 import { useToast } from "@/components/ui/Toast";
-
-type Tab = "requeridos" | "opcionales" | "con_stock";
-
-const TAB_LABELS: Record<Tab, string> = {
-  requeridos: "Requeridos",
-  opcionales: "Opcionales",
-  con_stock: "Con stock",
-};
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -42,63 +32,48 @@ function timeAgo(iso: string): string {
   return `hace ${Math.floor(diff / 86400)} días`;
 }
 
-function stockLabel(level: number | null): string {
-  return STOCK_LEVELS.find((s) => s.value === level)?.label ?? "Sin escanear";
-}
-
-function stockDays(level: number | null): string {
-  if (level === null) return "Sin escanear";
-  if (level === 0) return "0 días";
-  if (level <= 25) return "~5 días";
-  if (level <= 50) return "~15 días";
-  return "~30 días";
-}
-
 interface OptimizacionViewProps {
   items: ShoppingListItem[];
-  stockLevels: Record<string, number>;
+  stockRemaining: Record<string, number>;
   boughtThisCycle: Record<string, number>;
   knapsackResult: KnapsackResult | null;
   priceHistory: Record<string, PriceHistorySummary>;
   scraping: boolean;
   scrapeMsg: string;
-  monthlyBudget: number;
   lastScrapeTs: string | null;
   onScrape: () => void;
-  onGenerateOptimal: (excluded: Set<string>) => void;
+  onGenerateOptimal: () => void;
   onShareWhatsApp: (result: KnapsackResult) => void;
   onMarkPurchased: (
     rows: { item_id: string; quantity: number }[],
+  ) => void | Promise<void>;
+  /** Persiste la lista para que el bookmarklet la lea desde el supermercado */
+  onSaveCartSnapshot: (
+    rows: { skuId: string; quantity: number }[],
   ) => void | Promise<void>;
   onOpenList: () => void;
 }
 
 export function OptimizacionView({
   items,
-  stockLevels,
+  stockRemaining,
   boughtThisCycle,
   knapsackResult,
   priceHistory,
   scraping,
   scrapeMsg,
-  monthlyBudget,
   lastScrapeTs,
   onScrape,
   onGenerateOptimal,
   onShareWhatsApp,
   onMarkPurchased,
+  onSaveCartSnapshot,
   onOpenList,
 }: OptimizacionViewProps) {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>("requeridos");
-  const [excludedItems, setExcludedItems] = useState<Set<string>>(new Set());
   const [expandedSection, setExpandedSection] = useState<
     Record<string, boolean>
   >({});
-  const [simulatedBudget, setSimulatedBudget] = useState(monthlyBudget);
-  const [simulatedResult, setSimulatedResult] = useState<KnapsackResult | null>(
-    null,
-  );
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [markOpen, setMarkOpen] = useState(false);
   // item_id → comprado (true) / no había (false)
@@ -108,33 +83,17 @@ export function OptimizacionView({
   const qtyOf = (item: ShoppingListItem) =>
     suggestedQty(
       item,
-      stockLevels[item.id] ?? null,
+      stockRemaining[item.id] ?? null,
       boughtThisCycle[item.id] ?? 0,
     );
 
   // ── Datos derivados ─────────────────────────────────────────────────────
-  const tabGroups: Record<Tab, ShoppingListItem[]> = {
-    requeridos: sortByCategory(items).filter(
-      (i) => i.is_required && qtyOf(i) > 0,
-    ),
-    opcionales: sortByCategory(items).filter(
-      (i) => !i.is_required && qtyOf(i) > 0,
-    ),
-    con_stock: sortByCategory(items).filter(
-      (i) => !i.is_required && qtyOf(i) === 0,
-    ),
-  };
-  const currentTabItems = tabGroups[activeTab];
-  const PREVIEW = 4;
-  const visibleTabItems = expandedSection["tab"]
-    ? currentTabItems
-    : currentTabItems.slice(0, PREVIEW);
-
-  const displayResult = simulatedResult ?? knapsackResult;
+  const displayResult = knapsackResult;
   const selectedItems = displayResult
     ? [...displayResult.required, ...displayResult.included]
     : [];
-  const totalNeeded = tabGroups.requeridos.length + tabGroups.opcionales.length;
+  // Cuántos productos necesitan compra este ciclo (para calcular cobertura).
+  const totalNeeded = items.filter((i) => qtyOf(i) > 0).length;
   const coverage = displayResult
     ? Math.min(
         100,
@@ -151,22 +110,6 @@ export function OptimizacionView({
     const drop = hist.prevPrice - item.last_price;
     return drop > 0 ? sum + drop * qtyOf(item) : sum;
   }, 0);
-  const cheaperCount = items.filter((i) => {
-    const h = priceHistory[i.id];
-    return h?.prevPrice && i.last_price && i.last_price < h.prevPrice;
-  }).length;
-  const pricedCount = items.filter((i) => i.last_price).length;
-
-  const handleSimulate = () => {
-    const kItems = buildKnapsackItems(
-      items.filter((i) => !excludedItems.has(i.id)),
-      stockLevels,
-      suggestedQty,
-      formatQty,
-      boughtThisCycle,
-    );
-    setSimulatedResult(solveKnapsack(kItems, simulatedBudget));
-  };
 
   // Items de la lista óptima que se pueden marcar como comprados
   const markableItems: KnapsackItem[] = displayResult
@@ -202,8 +145,18 @@ export function OptimizacionView({
     }
   };
 
-  // ── Llenar carro en Jumbo ──
+  // ── Llenar carro en Supermercado ──
   const [cartWarnOpen, setCartWarnOpen] = useState(false);
+  // Instrucciones + snippet para pegar en la consola de Jumbo (ver utils/jumbo:
+  // el deep link de VTEX murió y el BFF solo acepta llamadas desde su origen).
+  const [cartHelpOpen, setCartHelpOpen] = useState(false);
+  const [snippetCopied, setSnippetCopied] = useState(false);
+  const [bookmarkletCopied, setBookmarkletCopied] = useState(false);
+  const [snapshotSaved, setSnapshotSaved] = useState(false);
+  // El marcador permanente solo sirve sobre https: desde el sitio del
+  // supermercado el navegador bloquea pedir a http:// por contenido mixto.
+  const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const canUseBookmarklet = appOrigin.startsWith("https://");
 
   // Cruza la lista óptima con los items para leer el jumbo_sku.
   const linkedRows = markableItems
@@ -214,12 +167,34 @@ export function OptimizacionView({
     .map((k) => ({ k, item: items.find((i) => i.id === k.id) }))
     .filter((x) => !x.item?.jumbo_sku);
 
-  const openJumboCart = () => {
+  // Unidades totales (sku × cantidad): es lo que cuenta el carro del
+  // supermercado, así que sirve para cuadrar lo que quedó agregado.
+  const totalUnits = markableItems.reduce((s, k) => s + k.qty, 0);
+  const linkedUnits = linkedRows.reduce((s, r) => s + r.qty, 0);
+
+  const copy = async (text: string, mark: (v: boolean) => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      mark(true);
+      setTimeout(() => mark(false), 2500);
+    } catch {
+      toast.error("No se pudo copiar; selecciona el texto y cópialo a mano");
+    }
+  };
+
+  const openJumboCart = async () => {
     if (linkedRows.length === 0) return;
-    window.open(buildJumboCartUrl(linkedRows), "_blank");
-    toast.success(
-      `Abriendo Jumbo con ${linkedRows.length} producto${linkedRows.length !== 1 ? "s" : ""}`,
-    );
+    setCartHelpOpen(true);
+    // Se guarda al abrir el modal para que el marcador permanente encuentre
+    // esta lista, sin depender de que se copie nada.
+    try {
+      await onSaveCartSnapshot(
+        linkedRows.map((r) => ({ skuId: r.sku, quantity: r.qty })),
+      );
+      setSnapshotSaved(true);
+    } catch {
+      setSnapshotSaved(false);
+    }
   };
 
   const handleFillCart = () => {
@@ -280,7 +255,7 @@ export function OptimizacionView({
                         <p
                           className={`truncate text-sm font-medium ${bought ? "text-text-primary" : "text-text-muted line-through"}`}
                         >
-                          {k.name} {k.brand}
+                          {k.name}
                         </p>
                         <p className="text-text-muted text-[11px]">
                           {k.formatQty}
@@ -333,7 +308,7 @@ export function OptimizacionView({
         </>
       )}
 
-      {/* ── Modal: productos sin vincular a Jumbo ────────────────────────── */}
+      {/* ── Modal: productos sin vincular a Supermercado ────────────────────────── */}
       {cartWarnOpen && (
         <>
           <div
@@ -344,12 +319,12 @@ export function OptimizacionView({
             <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-6 py-4">
               <div>
                 <h2 className="text-text-primary text-base font-bold">
-                  Productos sin vincular a Jumbo
+                  Productos sin vincular a Supermercado
                 </h2>
                 <p className="text-text-muted mt-0.5 text-xs">
                   {unlinkedItems.length} producto
                   {unlinkedItems.length !== 1 ? "s" : ""} no se agregarán al
-                  carro porque aún no tienen un equivalente de Jumbo.
+                  carro porque aún no tienen un equivalente de Supermercado.
                 </p>
               </div>
               <button
@@ -365,7 +340,7 @@ export function OptimizacionView({
                 {unlinkedItems.map(({ k }) => (
                   <div key={k.id} className="flex items-center gap-3 py-2">
                     <span className="text-text-primary text-sm font-medium">
-                      {k.name} {k.brand}
+                      {k.name}
                     </span>
                     <span className="text-text-muted ml-auto text-xs">
                       {k.formatQty}
@@ -394,8 +369,184 @@ export function OptimizacionView({
                 className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#1fa02e] px-5 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
               >
                 <ExternalLink className="h-4 w-4" strokeWidth={2} />
-                Abrir carro con {linkedRows.length}
+                Continuar con {linkedRows.length}
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Modal: llenar el carro con el snippet ────────────────────────── */}
+      {cartHelpOpen && (
+        <>
+          <div
+            onClick={() => setCartHelpOpen(false)}
+            className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
+          />
+          <div className="border-border-soft bg-bg-card fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border shadow-2xl">
+            <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-text-primary text-base font-bold">
+                  Llenar el carro con {linkedRows.length} producto
+                  {linkedRows.length !== 1 ? "s" : ""} · {linkedUnits} unidad
+                  {linkedUnits !== 1 ? "es" : ""}
+                </h2>
+                <p className="text-text-muted mt-0.5 text-xs">
+                  El supermercado solo acepta cambios al carro desde su propia
+                  página, así que el último paso se hace allá. Al terminar, el
+                  carro debería marcar {linkedUnits}.
+                </p>
+              </div>
+              <button
+                onClick={() => setCartHelpOpen(false)}
+                className="text-text-muted hover:bg-bg-soft cursor-pointer rounded-lg p-1.5"
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* ── Opción recomendada: marcador permanente ── */}
+              <div
+                className={`rounded-xl border p-4 ${
+                  canUseBookmarklet
+                    ? "border-greenCustom-200 bg-greenCustom-50"
+                    : "border-border-soft bg-bg-soft"
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Bookmark
+                    className="text-greenCustom-700 h-4 w-4 shrink-0"
+                    strokeWidth={2}
+                  />
+                  <h3 className="text-text-primary text-sm font-bold">
+                    Marcador (una sola vez, sin consola)
+                  </h3>
+                </div>
+                {canUseBookmarklet ? (
+                  <>
+                    <ol className="text-text-secondary flex list-decimal flex-col gap-1.5 pl-4 text-[13px] leading-snug">
+                      <li>
+                        Copia el marcador y créalo en tu navegador con ese texto
+                        como dirección, con el nombre{" "}
+                        <strong>{CART_BOOKMARK_NAME}</strong>.
+                      </li>
+                      <li>
+                        Estando en el sitio del supermercado con tu sesión
+                        iniciada, haz click en el marcador.
+                      </li>
+                    </ol>
+                    <p className="text-text-muted mt-2 text-[11px] leading-snug">
+                      Lee siempre tu lista óptima vigente, así que se crea una
+                      vez y no hay que rehacerlo cuando la lista cambie.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-text-secondary text-[13px] leading-snug">
+                    Disponible cuando abras la app por https. Desde el sitio del
+                    supermercado el navegador bloquea las peticiones a{" "}
+                    <code className="text-xs">http://localhost</code> por
+                    contenido mixto, así que aquí en local usa el código de
+                    abajo.
+                  </p>
+                )}
+              </div>
+
+              {/* ── Alternativa: pegar en consola ── */}
+              <div className="border-border-soft mt-3 rounded-xl border p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Terminal
+                    className="text-text-muted h-4 w-4 shrink-0"
+                    strokeWidth={2}
+                  />
+                  <h3 className="text-text-primary text-sm font-bold">
+                    Código para la consola
+                  </h3>
+                </div>
+                <ol className="text-text-secondary flex list-decimal flex-col gap-1.5 pl-4 text-[13px] leading-snug">
+                  <li>
+                    Copia el código: lleva tus {linkedRows.length} productos
+                    dentro.
+                  </li>
+                  <li>
+                    Abre{" "}
+                    <a
+                      href="https://www.jumbo.cl"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-greenCustom-700 font-semibold underline"
+                    >
+                      el sitio del supermercado
+                    </a>{" "}
+                    con tu sesión iniciada y tu tienda seleccionada.
+                  </li>
+                  <li>
+                    Abre la consola (⌥⌘C), pega y Enter. Si el código lo pide,
+                    abre el carro una vez.
+                  </li>
+                </ol>
+              </div>
+
+              <p className="text-text-muted mt-4 text-[11px] leading-snug">
+                Tus datos de sesión no salen de la pestaña del supermercado: el
+                código los usa ahí mismo. Esta app solo aporta la lista de
+                productos y cantidades
+                {snapshotSaved ? " (ya guardada para el marcador)" : ""}.
+              </p>
+            </div>
+
+            <div className="border-border-soft flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
+              <button
+                onClick={() => setCartHelpOpen(false)}
+                className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() =>
+                  copy(buildCartSnippet(linkedRows), setSnippetCopied)
+                }
+                className="border-border-default bg-bg-card text-text-primary hover:bg-bg-soft flex cursor-pointer items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
+              >
+                {snippetCopied ? (
+                  <>
+                    <Check className="h-4 w-4" strokeWidth={2.5} /> Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" strokeWidth={2} /> Copiar código
+                  </>
+                )}
+              </button>
+              {canUseBookmarklet && (
+                <button
+                  onClick={() =>
+                    copy(
+                      buildCartBookmarklet(
+                        appOrigin,
+                        process.env.NEXT_PUBLIC_CART_TOKEN,
+                      ),
+                      setBookmarkletCopied,
+                    )
+                  }
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-bold text-white transition-all ${
+                    bookmarkletCopied
+                      ? "bg-success"
+                      : "bg-button-primary hover:opacity-90"
+                  }`}
+                >
+                  {bookmarkletCopied ? (
+                    <>
+                      <Check className="h-4 w-4" strokeWidth={2.5} /> Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-4 w-4" strokeWidth={2} /> Copiar
+                      marcador
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </>
@@ -403,152 +554,12 @@ export function OptimizacionView({
 
       {/* ── Columna principal ──────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
-        {/* SECCIÓN 1 — Lo que te falta */}
-        <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-text-primary text-base font-bold">
-              1. Lo que te falta
-            </h2>
-            <div className="group relative">
-              <span className="bg-bg-soft text-text-muted flex h-4 w-4 cursor-help items-center justify-center rounded-full text-[10px] font-bold">
-                ?
-              </span>
-              <div className="bg-text-primary pointer-events-none absolute top-5 left-0 z-20 hidden w-64 rounded-xl p-3 text-xs text-white shadow-lg group-hover:block">
-                <p>
-                  <span className="font-bold">Requeridos:</span> siempre los
-                  compras, sin importar el presupuesto.
-                </p>
-                <p className="mt-1">
-                  <span className="font-bold">Por reponer:</span> opcionales con
-                  stock bajo — entran si alcanza.
-                </p>
-                <p className="mt-1">
-                  <span className="font-bold">En stock:</span> opcionales bien
-                  cubiertos — no son urgentes.
-                </p>
-              </div>
-            </div>
-          </div>
-          <p className="text-text-muted mt-0.5 text-sm">
-            Revisa y ajusta lo que realmente necesitas.
-          </p>
-
-          {/* Tabs */}
-          <div className="mt-4 flex gap-2">
-            {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setExpandedSection((p) => ({ ...p, tab: false }));
-                }}
-                className={`cursor-pointer rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
-                  activeTab === tab
-                    ? "bg-greenCustom-700 text-white"
-                    : "bg-bg-soft text-text-muted hover:bg-greenCustom-100 hover:text-greenCustom-700"
-                }`}
-              >
-                {TAB_LABELS[tab]} ({tabGroups[tab].length})
-              </button>
-            ))}
-          </div>
-
-          {/* Lista de items */}
-          <div className="divide-border-soft mt-4 flex flex-col divide-y">
-            {visibleTabItems.length === 0 ? (
-              <p className="text-text-muted py-6 text-center text-sm">
-                {activeTab === "con_stock"
-                  ? "Todo está bien cubierto, no hay urgencia de compra."
-                  : "Sin productos en esta categoría."}
-              </p>
-            ) : (
-              visibleTabItems.map((item) => {
-                const meta =
-                  CATEGORY_META[item.category] ?? CATEGORY_META["Despensa"];
-                const level = stockLevels[item.id] ?? null;
-                const qty = qtyOf(item);
-
-                const isExcluded = excludedItems.has(item.id);
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 py-3 ${isExcluded ? "opacity-40" : ""}`}
-                  >
-                    <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-                      style={{ background: meta.bg }}
-                    >
-                      {meta.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-text-primary truncate text-sm font-semibold">
-                        {item.name}
-                        {item.brand ? ` ${item.brand}` : ""}
-                      </p>
-                      <p className="text-text-muted text-[11px]">
-                        Stock: {stockLabel(level)} · {stockDays(level)}
-                      </p>
-                    </div>
-
-                    <span className="bg-bg-soft text-text-primary shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold">
-                      {formatQty(item, qty)}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setExcludedItems((prev) => {
-                          const n = new Set(prev);
-                          if (n.has(item.id)) {
-                            n.delete(item.id);
-                          } else {
-                            n.add(item.id);
-                          }
-                          return n;
-                        })
-                      }
-                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-2 transition-all ${isExcluded ? "border-border-default bg-white" : "border-greenCustom-600 bg-greenCustom-600"}`}
-                    >
-                      {!isExcluded && (
-                        <svg
-                          className="h-3.5 w-3.5 text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {currentTabItems.length > PREVIEW && (
-            <button
-              onClick={() =>
-                setExpandedSection((p) => ({ ...p, tab: !p["tab"] }))
-              }
-              className="text-greenCustom-600 hover:text-greenCustom-700 mt-3 flex w-full cursor-pointer items-center justify-center gap-1 text-xs font-semibold"
-            >
-              {expandedSection["tab"]
-                ? "Ver menos ↑"
-                : `Ver todos los ${currentTabItems.length} ${TAB_LABELS[activeTab].toLowerCase()} ↓`}
-            </button>
-          )}
-        </div>
-
-        {/* SECCIÓN 2 — Mejor combinación */}
+        {/* Mejor combinación (resultado optimizado) */}
         <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-text-primary text-base font-bold">
-                2. Mejor combinación para ti
+                Mejor combinación para ti
               </h2>
               {displayResult && (
                 <span className="bg-greenCustom-100 text-greenCustom-700 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold">
@@ -556,17 +567,9 @@ export function OptimizacionView({
                   Optimización activa
                 </span>
               )}
-              {simulatedResult && (
-                <span className="bg-tag-important-bg text-tag-important-text rounded-full px-2.5 py-1 text-[11px] font-semibold">
-                  Simulado · {formatPrice(simulatedBudget)}
-                </span>
-              )}
             </div>
             <button
-              onClick={() => {
-                setSimulatedResult(null);
-                onGenerateOptimal(excludedItems);
-              }}
+              onClick={() => onGenerateOptimal()}
               disabled={items.length === 0}
               className="border-border-default bg-bg-soft text-text-primary hover:bg-greenCustom-100 hover:text-greenCustom-700 flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all disabled:opacity-40"
             >
@@ -584,18 +587,39 @@ export function OptimizacionView({
                 Genera la lista óptima para ver la mejor combinación
               </p>
               <p className="text-text-muted text-xs">
-                Actualiza precios primero, luego haz clic en Recalcular
+                Actualiza precios primero, luego haz click en Recalcular
               </p>
               <button
-                onClick={() => onGenerateOptimal(excludedItems)}
+                onClick={() => onGenerateOptimal()}
                 disabled={items.length === 0}
-                className="bg-button-primary mt-3 cursor-pointer rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                className="text-text-primary mt-3 cursor-pointer rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
               >
                 Generar Lista Óptima
               </button>
             </div>
           ) : (
             <>
+              {displayResult.overBudget && (
+                <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                  <p className="text-sm font-bold text-amber-800">
+                    ⚠️ Tus requeridos no caben en el presupuesto
+                  </p>
+                  <p className="mt-1 text-xs leading-snug text-amber-700">
+                    {displayResult.requiredDropped.length} producto
+                    {displayResult.requiredDropped.length !== 1 ? "s" : ""}{" "}
+                    requerido
+                    {displayResult.requiredDropped.length !== 1 ? "s" : ""} no
+                    entró este ciclo. Necesitarías{" "}
+                    <strong>
+                      {formatPrice(displayResult.requiredShortfall)}
+                    </strong>{" "}
+                    más para incluirlos todos. Se priorizaron los que cabían
+                    (más productos por tu presupuesto). Súbelos con más
+                    presupuesto, márcalos como opcionales, o divídelos en dos
+                    compras.
+                  </p>
+                </div>
+              )}
               <div className="mt-4 flex gap-4">
                 {/* Stats card */}
                 <div className="bg-greenCustom-100 w-52 shrink-0 rounded-2xl p-4">
@@ -626,7 +650,7 @@ export function OptimizacionView({
                           estimatedSavings > 0
                             ? formatPrice(estimatedSavings)
                             : "$0",
-                        cls: "text-greenCustom-600",
+                        cls: "text-success",
                       },
                       {
                         label: "Cobertura",
@@ -690,7 +714,7 @@ export function OptimizacionView({
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="text-text-primary truncate text-sm font-medium">
-                              {kItem.name} {kItem.brand}
+                              {kItem.name}
                             </p>
                             <p className="text-text-muted text-[11px]">
                               {kItem.formatQty}
@@ -701,7 +725,7 @@ export function OptimizacionView({
                               {kItem.cost ? formatPrice(kItem.cost) : "—"}
                             </p>
                             {isCheapest && (
-                              <span className="bg-greenCustom-100 text-greenCustom-600 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+                              <span className="bg-success-bg text-success rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
                                 Mejor precio
                               </span>
                             )}
@@ -761,8 +785,15 @@ export function OptimizacionView({
                           key={item.id}
                           className="flex items-center justify-between py-2"
                         >
-                          <p className="text-text-muted text-xs line-through">
-                            {item.name} — {item.formatQty}
+                          <p className="text-text-muted flex items-center gap-1.5 text-xs">
+                            <span className="line-through">
+                              {item.name} — {item.formatQty}
+                            </span>
+                            {item.is_required && (
+                              <span className="bg-tag-essential-bg text-tag-essential-text rounded-full px-1.5 py-0.5 text-[9px] font-bold no-underline">
+                                Requerido
+                              </span>
+                            )}
                           </p>
                           <span className="text-text-muted text-xs">
                             {item.cost ? formatPrice(item.cost) : "—"}
@@ -776,17 +807,11 @@ export function OptimizacionView({
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  onClick={() => onGenerateOptimal(excludedItems)}
+                  onClick={() => onGenerateOptimal()}
                   disabled={items.length === 0}
-                  className="bg-button-primary flex-1 cursor-pointer rounded-xl py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                  className="bg-accent-gold-soft text-text-primary flex-1 cursor-pointer rounded-xl py-2.5 text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
                 >
                   Generar Lista Óptima
-                </button>
-                <button
-                  onClick={() => onShareWhatsApp(displayResult)}
-                  className="flex-1 cursor-pointer rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90"
-                >
-                  Compartir WhatsApp
                 </button>
                 <button
                   onClick={openMark}
@@ -796,55 +821,9 @@ export function OptimizacionView({
                   <ShoppingCart className="h-4 w-4" strokeWidth={2} /> Marcar
                   como comprado
                 </button>
-                <button
-                  onClick={handleFillCart}
-                  disabled={markableItems.length === 0}
-                  className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#1fa02e] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-                >
-                  <ExternalLink className="h-4 w-4" strokeWidth={2} /> Llenar
-                  carro en Jumbo
-                </button>
               </div>
             </>
           )}
-
-          {/* Simulador */}
-          <div className="border-border-soft mt-5 border-t pt-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-text-primary text-sm font-semibold">
-                  Simular con otro presupuesto
-                </p>
-                <p className="text-text-muted text-xs">
-                  Ajusta y ve cómo cambia tu combinación.
-                </p>
-              </div>
-              <span className="text-text-primary text-base font-bold">
-                {formatPrice(simulatedBudget)}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={50000}
-                max={Math.round((monthlyBudget * 1.5) / 5000) * 5000}
-                step={5000}
-                value={simulatedBudget}
-                onChange={(e) => {
-                  setSimulatedBudget(Number(e.target.value));
-                  setSimulatedResult(null);
-                }}
-                className="accent-greenCustom-700 flex-1"
-              />
-              <button
-                onClick={handleSimulate}
-                disabled={items.length === 0}
-                className="border-border-default bg-bg-soft text-text-primary hover:border-greenCustom-200 hover:bg-greenCustom-100 hover:text-greenCustom-700 cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all disabled:opacity-40"
-              >
-                Simular
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -860,7 +839,9 @@ export function OptimizacionView({
               J
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-text-primary text-sm font-semibold">Jumbo</p>
+              <p className="text-text-primary text-sm font-semibold">
+                Supermercado
+              </p>
               <p className="text-text-muted truncate text-[11px]">
                 {lastScrapeTs
                   ? `Actualizado ${timeAgo(lastScrapeTs)}`
@@ -895,90 +876,54 @@ export function OptimizacionView({
           )}
         </div>
 
-        {/* Card 2: Insights */}
+        {/* Card 2: Acciones de la lista óptima */}
         <div className="border-border-soft bg-bg-card rounded-2xl border p-4">
-          <h3 className="text-text-primary mb-3 font-bold">Insights para ti</h3>
-          <div className="flex flex-col gap-3">
-            {cheaperCount > 0 && (
-              <div className="flex items-start gap-3">
-                <div className="bg-tag-important-bg flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
-                  <Zap
-                    className="text-tag-important-text h-4 w-4"
-                    strokeWidth={2}
-                  />
-                </div>
-                <div>
-                  <p className="text-text-primary text-xs font-semibold">
-                    Comprar hoy te ahorra{" "}
-                    {estimatedSavings > 0
-                      ? formatPrice(estimatedSavings)
-                      : "dinero"}
-                  </p>
-                  <p className="text-text-muted text-[11px]">
-                    {cheaperCount} producto{cheaperCount > 1 ? "s" : ""} más
-                    barato{cheaperCount > 1 ? "s" : ""} que la semana pasada.
-                  </p>
-                </div>
+          <h3 className="text-text-primary mb-3 font-bold">Tu lista óptima</h3>
+          {displayResult ? (
+            <div className="flex flex-col gap-2">
+              {/* Contador para cuadrar con el carro del supermercado, que
+                  cuenta unidades (sku × cantidad), no productos distintos. */}
+              <div className="border-border-soft divide-border-soft bg-bg-soft mb-1 flex items-stretch divide-x rounded-xl border">
+                {[
+                  { label: "Productos", value: markableItems.length },
+                  { label: "Unidades", value: totalUnits },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex-1 px-3 py-2 text-center">
+                    <p className="text-text-primary text-lg leading-tight font-bold">
+                      {value}
+                    </p>
+                    <p className="text-text-muted text-[11px]">{label}</p>
+                  </div>
+                ))}
               </div>
-            )}
-            {displayResult && coverage > 0 && (
-              <div className="flex items-start gap-3">
-                <div className="bg-greenCustom-100 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
-                  <BadgeCheck
-                    className="text-greenCustom-700 h-4 w-4"
-                    strokeWidth={2}
-                  />
-                </div>
-                <div>
-                  <p className="text-text-primary text-xs font-semibold">
-                    Cubre el {coverage}% de tus necesidades
-                  </p>
-                  <p className="text-text-muted text-[11px]">
-                    Tu presupuesto cubre bien la canasta del mes.
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="flex items-start gap-3">
-              <div className="bg-greenCustom-100 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
-                <ShoppingBasket
-                  className="text-greenCustom-700 h-4 w-4"
-                  strokeWidth={2}
-                />
-              </div>
-              <div>
-                <p className="text-text-primary text-xs font-semibold">
-                  Jumbo tiene los mejores precios
+              {unlinkedItems.length > 0 && (
+                <p className="text-text-muted -mt-1 mb-1 text-center text-[11px] leading-snug">
+                  Al carro van {linkedUnits} unidades: {unlinkedItems.length}{" "}
+                  producto{unlinkedItems.length !== 1 ? "s" : ""} sin vincular
+                  quedan fuera.
                 </p>
-                <p className="text-text-muted text-[11px]">
-                  En {pricedCount} de {items.length} productos actualizados.
-                </p>
-              </div>
+              )}
+              <button
+                onClick={() => onShareWhatsApp(displayResult)}
+                className="cursor-pointer rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90"
+              >
+                Compartir por WhatsApp
+              </button>
+              <button
+                onClick={handleFillCart}
+                disabled={markableItems.length === 0}
+                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#1fa02e] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+              >
+                <ExternalLink className="h-4 w-4" strokeWidth={2} /> Llenar
+                carro en Supermercado
+              </button>
             </div>
-          </div>
-        </div>
-
-        {/* Card 3: CTA manual */}
-        <div className="border-greenCustom-200 bg-greenCustom-100 flex items-center gap-3 rounded-2xl border p-4">
-          <Image
-            src="/icon_right.png"
-            alt=""
-            width={72}
-            height={72}
-            className="aspect-square shrink-0"
-            loading="eager"
-          />
-          <div>
-            <p className="text-text-primary text-sm font-semibold">
-              ¿Prefieres armar tu lista manualmente?
+          ) : (
+            <p className="text-text-muted text-xs">
+              Genera la lista óptima para compartirla o llenar el carro de
+              Supermercado con un click.
             </p>
-            <button
-              onClick={onOpenList}
-              className="text-greenCustom-600 hover:text-greenCustom-700 mt-1 cursor-pointer text-xs font-semibold"
-            >
-              Ir a lista sugerida →
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -7,20 +7,27 @@ import {
   CATEGORY_META,
   sortByCategory,
 } from "@/components/shopping-list/constants";
-import { STOCK_LEVELS, formatPrice } from "@/utils/stock";
+import {
+  suggestedQty,
+  stockRatio,
+  stockAppearance,
+  stockUnit,
+  formatAmount,
+  formatPrice,
+} from "@/utils/stock";
 import type { ShoppingListItem, PriceHistorySummary } from "@/types/shopping";
 
 interface InventarioViewProps {
   items: ShoppingListItem[];
-  stockLevels: Record<string, number>;
+  stockRemaining: Record<string, number>;
   priceHistory: Record<string, PriceHistorySummary>;
-  onStockUpdate: (id: string, level: number) => void;
+  onStockUpdate: (id: string, remaining: number) => void;
   onClearAll: () => void;
 }
 
 export function InventarioView({
   items,
-  stockLevels,
+  stockRemaining,
   priceHistory,
   onStockUpdate,
   onClearAll,
@@ -107,7 +114,17 @@ export function InventarioView({
           filtered.map((item) => {
             const meta =
               CATEGORY_META[item.category] ?? CATEGORY_META["Despensa"];
-            const level = stockLevels[item.id] ?? null;
+            const quantity = item.quantity;
+            const remaining = stockRemaining[item.id] ?? 0;
+            // Envases/unidades enteras → paso 1; a granel (kg, L…) → paso 0,5.
+            const step = item.package_size || item.unit === "un" ? 1 : 0.5;
+            const round = (n: number) => Math.round(n * 1000) / 1000;
+            const setRemaining = (v: number) =>
+              onStockUpdate(item.id, round(Math.max(0, Math.min(quantity, v))));
+            const ratio = stockRatio(remaining, quantity);
+            const appearance = stockAppearance(ratio);
+            const toBuy = suggestedQty(item, remaining, 0);
+            const unit = stockUnit(item);
             return (
               <div
                 key={item.id}
@@ -127,11 +144,6 @@ export function InventarioView({
                     {item.name}
                   </p>
                   <div className="mt-0.5 flex items-center gap-2">
-                    {item.brand && (
-                      <span className="text-text-muted text-xs">
-                        {item.brand}
-                      </span>
-                    )}
                     {item.last_price && (
                       <>
                         <span className="text-text-primary text-xs font-semibold">
@@ -141,7 +153,7 @@ export function InventarioView({
                           const t = priceTrend(item.id, item.last_price);
                           return t ? (
                             <span
-                              className={`text-[10px] font-bold ${t.up ? "text-red-500" : "text-greenCustom-600"}`}
+                              className={`text-[10px] font-bold ${t.up ? "text-red-500" : "text-success"}`}
                             >
                               {t.up ? "↑" : "↓"}
                               {Math.abs(t.diff)}%
@@ -153,34 +165,57 @@ export function InventarioView({
                   </div>
                 </div>
 
-                {/* Stock level selector */}
-                <div className="flex shrink-0 gap-1">
-                  {STOCK_LEVELS.map((sl) => {
-                    const isSelected = level === sl.value;
-                    return (
+                {/* Stock restante: cuánto te queda hoy (0 → objetivo mensual) */}
+                <div className="flex w-52 shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-text-muted text-[11px]">
+                      Te queda
+                    </span>
+                    <div className="border-border-soft bg-bg-card flex items-center gap-1 rounded-full border px-1 py-0.5">
                       <button
-                        key={sl.value}
-                        onClick={() => onStockUpdate(item.id, sl.value)}
-                        className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
-                          isSelected
-                            ? ""
-                            : "bg-bg-soft text-text-muted hover:bg-border-soft"
-                        }`}
-                        style={
-                          isSelected
-                            ? {
-                                background: sl.bg,
-                                color: sl.color,
-                                outline: `1.5px solid ${sl.bar}`,
-                                outlineOffset: "0px",
-                              }
-                            : {}
-                        }
+                        onClick={() => setRemaining(remaining - step)}
+                        disabled={remaining <= 0}
+                        className="text-text-secondary hover:bg-bg-soft flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-base leading-none disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label="Menos"
                       >
-                        {sl.label}
+                        −
                       </button>
-                    );
-                  })}
+                      <span className="min-w-18 text-center text-sm font-bold">
+                        <span className="text-text-primary">
+                          {formatAmount(remaining)}
+                        </span>
+                        <span className="text-text-muted text-[11px] font-medium">
+                          {" "}
+                          / {formatAmount(quantity)} {unit}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => setRemaining(remaining + step)}
+                        disabled={remaining >= quantity}
+                        className="text-text-secondary hover:bg-bg-soft flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-base leading-none disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label="Más"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-bg-soft h-1.5 w-full overflow-hidden rounded-full">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${ratio * 100}%`,
+                        background: appearance.bar,
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="text-[11px] font-semibold"
+                    style={{ color: toBuy > 0 ? "#C2410C" : "#15803D" }}
+                  >
+                    {toBuy > 0
+                      ? `Comprar ${toBuy} ${unit}`
+                      : "Completo para el mes"}
+                  </span>
                 </div>
               </div>
             );

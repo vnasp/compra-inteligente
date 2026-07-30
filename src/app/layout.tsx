@@ -9,7 +9,7 @@ const interSerif = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Smart Pantry — Compra Inteligente",
+  title: "Compra Inteligente",
   description:
     "Gestiona tu despensa y optimiza tus compras con inteligencia artificial.",
 };
