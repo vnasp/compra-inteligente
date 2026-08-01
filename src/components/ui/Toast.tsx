@@ -93,7 +93,7 @@ function ToastRow({
       className={`pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 shadow-lg ${
         isSuccess
           ? "border-success-border bg-success-bg text-success"
-          : "border-red-200 bg-red-50 text-red-700"
+          : "border-danger-border bg-danger-bg text-danger"
       }`}
     >
       {isSuccess ? (
@@ -102,7 +102,7 @@ function ToastRow({
           strokeWidth={2}
         />
       ) : (
-        <XCircle className="h-5 w-5 shrink-0 text-red-500" strokeWidth={2} />
+        <XCircle className="text-danger h-5 w-5 shrink-0" strokeWidth={2} />
       )}
       <span className="flex-1 text-sm font-semibold">{toast.message}</span>
       <button

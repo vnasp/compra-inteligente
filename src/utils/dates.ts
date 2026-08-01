@@ -12,7 +12,7 @@ export function toISO(d: Date): string {
 }
 
 /** "YYYY-MM-DD" → Date al mediodía local (evita saltos por zona horaria) */
-export function fromISO(iso: string): Date {
+function fromISO(iso: string): Date {
   return new Date(iso + "T12:00:00");
 }
 

@@ -120,7 +120,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-border-soft bg-bg-soft px-3 py-2.5 text-sm text-text-primary outline-none focus:border-greenCustom-400";
+    "input-field bg-bg-soft px-3 py-2.5 focus:border-brand-400";
   const labelClass = "mb-1.5 block text-sm font-semibold text-text-primary";
   const hintClass = "mt-1 text-xs text-text-muted";
 
@@ -141,7 +141,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
         {/* ── Left column: form ── */}
         <div className="flex flex-col gap-5">
           {/* Presupuesto */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+          <div className="app-card">
             <h2 className="text-text-primary mb-4 text-sm font-bold">
               Presupuesto mensual
             </h2>
@@ -159,7 +159,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
           </div>
 
           {/* Calendario de compras */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+          <div className="app-card">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-text-primary text-sm font-bold">
                 Días de compra
@@ -170,7 +170,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                     type="button"
                     onClick={() => shiftMonth(-1)}
                     title="Mes anterior"
-                    className="border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300 hover:text-greenCustom-700 cursor-pointer rounded-lg border p-1.5 transition-all"
+                    className="button-secondary h-8 w-8 rounded-lg p-0"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
                   </button>
@@ -181,7 +181,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                     type="button"
                     onClick={() => shiftMonth(1)}
                     title="Mes siguiente"
-                    className="border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-300 hover:text-greenCustom-700 cursor-pointer rounded-lg border p-1.5 transition-all"
+                    className="button-secondary h-8 w-8 rounded-lg p-0"
                   >
                     <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
                   </button>
@@ -216,10 +216,10 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                         aria-pressed={selected}
                         className={`cursor-pointer rounded-lg border py-2 text-xs font-semibold transition-all ${
                           selected
-                            ? "border-greenCustom-600 bg-greenCustom-700 text-white"
+                            ? "border-brand-600 bg-brand-700 text-white"
                             : isToday
-                              ? "border-greenCustom-400 bg-bg-soft text-greenCustom-700"
-                              : `border-border-soft bg-bg-soft hover:border-greenCustom-300 ${isPast ? "text-text-muted/60" : "text-text-muted"}`
+                              ? "border-brand-400 bg-bg-soft text-brand-700"
+                              : `border-border-soft bg-bg-soft hover:border-brand-300 ${isPast ? "text-text-muted/60" : "text-text-muted"}`
                         }`}
                       >
                         {parseInt(iso.slice(8), 10)}
@@ -240,11 +240,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50 ${
-              saved
-                ? "bg-greenCustom-600"
-                : "bg-button-primary hover:opacity-90"
-            }`}
+            className={`w-full py-3 ${saved ? "button-success" : "button-primary"}`}
           >
             {saved ? (
               <>
@@ -262,7 +258,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
         {/* ── Right column: info cards ── */}
         <div className="flex flex-col gap-5">
           {/* Próximas compras */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+          <div className="app-card">
             <h2 className="text-text-primary mb-1 text-sm font-bold">
               Próximas compras
             </h2>
@@ -278,10 +274,10 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                 {upcoming.map((iso) => (
                   <div
                     key={iso}
-                    className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${
+                    className={`app-row flex items-center justify-between rounded-xl border px-4 py-2.5 ${
                       iso === nextDate
-                        ? "border-greenCustom-200 bg-greenCustom-50"
-                        : "border-border-soft bg-bg-soft"
+                        ? "border-success-border bg-bg-card"
+                        : "border-border-soft"
                     }`}
                   >
                     <div>
@@ -289,9 +285,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                         {formatLongDate(iso)}
                       </p>
                       {iso === nextDate && (
-                        <p className="text-greenCustom-600 text-xs">
-                          Próxima compra
-                        </p>
+                        <p className="text-success text-xs">Próxima compra</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -299,7 +293,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                         type="button"
                         onClick={() => openGoogleCalendar(iso)}
                         title="Agregar al Calendario"
-                        className="border-border-soft bg-bg-card text-text-muted hover:border-greenCustom-200 hover:text-greenCustom-700 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all"
+                        className="button-secondary h-8 w-8 rounded-lg p-0"
                       >
                         <CalendarPlus className="h-4 w-4" strokeWidth={1.75} />
                       </button>
@@ -307,7 +301,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
                         type="button"
                         onClick={() => toggleDate(iso)}
                         title="Quitar fecha"
-                        className="text-text-muted flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-all hover:bg-red-50 hover:text-red-500"
+                        className="text-text-muted hover:bg-danger-bg hover:text-danger flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-all"
                       >
                         <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                       </button>
@@ -319,22 +313,18 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
           </div>
 
           {/* Supermercado */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+          <div className="app-card">
             <h2 className="text-text-primary mb-1 text-sm font-bold">
               Supermercado
             </h2>
             <p className="text-text-muted mb-4 text-xs">
               Los precios se actualizan desde esta tienda
             </p>
-            <div className="border-greenCustom-200 bg-greenCustom-50 flex items-center gap-3 rounded-xl border px-4 py-3">
-              <div className="bg-greenCustom-700 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white">
-                J
-              </div>
+            <div className="app-row flex items-center gap-3 rounded-xl border px-4 py-3">
+              <div className="icon-box-brand h-9 w-9 text-sm font-black">J</div>
               <div>
-                <p className="text-greenCustom-800 font-semibold">
-                  Supermercado
-                </p>
-                <p className="text-greenCustom-600 text-xs">
+                <p className="text-text-primary font-semibold">Supermercado</p>
+                <p className="text-success text-xs">
                   Scraping de precios activo
                 </p>
               </div>
@@ -342,7 +332,7 @@ export function ConfigView({ config, setConfig }: ConfigViewProps) {
           </div>
 
           {/* Resumen actual */}
-          <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+          <div className="app-card">
             <h2 className="text-text-primary mb-4 text-sm font-bold">
               Configuración actual
             </h2>

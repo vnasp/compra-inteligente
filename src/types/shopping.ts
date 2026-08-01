@@ -25,7 +25,7 @@ export interface ShoppingListItem {
 }
 
 // Para crear un ítem (sin campos autogenerados)
-export type NewShoppingListItem = Omit<
+type NewShoppingListItem = Omit<
   ShoppingListItem,
   "id" | "last_price" | "price_updated_at" | "created_at" | "updated_at"
 >;

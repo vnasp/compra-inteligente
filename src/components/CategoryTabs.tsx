@@ -31,8 +31,8 @@ export function CategoryTabs({
             onClick={() => onSelect(cat)}
             className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-all ${
               isActive
-                ? "bg-greenCustom-700 text-white"
-                : "bg-bg-soft text-text-muted hover:bg-greenCustom-100 hover:text-greenCustom-700"
+                ? "bg-brand-700 text-white"
+                : "bg-bg-soft text-text-muted hover:text-brand-700"
             }`}
           >
             {cat !== "Todos" && <span>{CATEGORY_META[cat]?.icon}</span>}

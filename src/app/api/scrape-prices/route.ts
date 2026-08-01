@@ -6,6 +6,7 @@ import {
   fetchJumboHtml,
   JumboRateLimitError,
 } from "@/utils/jumbo";
+import { PRICE_SCRAPE_MAX_ITEMS_PER_REQUEST } from "@/config";
 
 interface ScrapeItem {
   id: string;
@@ -23,12 +24,8 @@ interface PriceResult {
   source: string;
 }
 
-// Tope por request: el cliente envía en tandas (ver handleScrape en page.tsx).
-// El pacing (≈1 request/s) lo aplica fetchJumboHtml, no este route.
-const MAX_ITEMS = 15;
-
 // Medido: ~1,2 s por producto vía sku (manda la espera del rate limiter) y hasta
-// ~3 s si cae al fallback por nombre; una tanda de 12 tomó 14 s. 60 s deja
+// ~3 s si cae al fallback por nombre; una tanda de 15 toma ~18 s. 60 s deja
 // margen de sobra y es el tope del plan Hobby de Vercel.
 export const maxDuration = 60;
 
@@ -101,9 +98,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (items.length > MAX_ITEMS) {
+    if (items.length > PRICE_SCRAPE_MAX_ITEMS_PER_REQUEST) {
       return NextResponse.json(
-        { error: `Máximo ${MAX_ITEMS} productos por solicitud` },
+        {
+          error: `Máximo ${PRICE_SCRAPE_MAX_ITEMS_PER_REQUEST} productos por solicitud`,
+        },
         { status: 400 },
       );
     }

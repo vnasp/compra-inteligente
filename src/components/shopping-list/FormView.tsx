@@ -99,8 +99,7 @@ export function FormView({
     setSearching(true);
   };
 
-  const inputClass =
-    "w-full px-3 py-2.5 rounded-xl border-[1.5px] border-border-soft bg-bg-soft text-sm text-text-primary outline-none box-border focus:border-greenCustom-400";
+  const inputClass = "input-field box-border bg-bg-soft px-3 py-2.5";
   const labelClass = "block font-semibold text-xs text-text-secondary mb-1";
 
   const qtyLabel = form.package_size
@@ -129,7 +128,7 @@ export function FormView({
 
           {hasProduct && !searching ? (
             // Producto vinculado
-            <div className="border-greenCustom-200 bg-greenCustom-50 flex items-center gap-2.5 rounded-xl border-[1.5px] p-2.5">
+            <div className="app-row border-success-border flex items-center gap-2.5 rounded-xl border p-2.5">
               {form.jumbo_image ? (
                 <Image
                   src={form.jumbo_image}
@@ -140,18 +139,15 @@ export function FormView({
                   className="h-11 w-11 shrink-0 rounded-lg bg-white object-contain"
                 />
               ) : (
-                <div className="bg-greenCustom-100 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
-                  <Check
-                    className="text-greenCustom-600 h-5 w-5"
-                    strokeWidth={2.5}
-                  />
+                <div className="icon-box-success flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
+                  <Check className="text-success h-5 w-5" strokeWidth={2.5} />
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-greenCustom-900 truncate text-sm font-semibold">
+                <p className="text-text-primary truncate text-sm font-semibold">
                   {form.jumbo_name}
                 </p>
-                <p className="text-greenCustom-700 text-[11px]">
+                <p className="text-success text-[11px]">
                   {form.last_price
                     ? formatPrice(form.last_price)
                     : "Sin precio"}{" "}
@@ -161,14 +157,14 @@ export function FormView({
               <button
                 type="button"
                 onClick={changeProduct}
-                className="text-greenCustom-700 hover:bg-greenCustom-100 shrink-0 cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
+                className="text-text-secondary hover:bg-bg-soft hover:text-brand-700 shrink-0 cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
               >
                 Cambiar
               </button>
             </div>
           ) : (
             // Buscador
-            <div className="border-border-soft bg-bg-soft flex flex-col gap-2 rounded-xl border-[1.5px] p-3">
+            <div className="app-row flex flex-col gap-2 rounded-xl border p-3">
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search
@@ -193,20 +189,20 @@ export function FormView({
                   type="button"
                   onClick={runJumboSearch}
                   disabled={jumboLoading}
-                  className="bg-greenCustom-700 hover:bg-greenCustom-800 shrink-0 cursor-pointer rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-50"
+                  className="button-secondary shrink-0 rounded-lg px-3 py-2 text-xs"
                 >
                   {jumboLoading ? "…" : "Buscar"}
                 </button>
               </div>
 
               {jumboResults.length > 0 && (
-                <div className="border-border-soft max-h-64 overflow-y-auto rounded-lg border bg-white">
+                <div className="app-panel max-h-64 overflow-y-auto rounded-lg">
                   {jumboResults.map((c) => (
                     <button
                       type="button"
                       key={c.sku}
                       onClick={() => selectProduct(c)}
-                      className="border-border-soft hover:bg-greenCustom-50 flex w-full cursor-pointer items-center gap-2.5 border-b px-2.5 py-2 text-left last:border-0"
+                      className="app-row flex w-full cursor-pointer items-center gap-2.5 border-b px-2.5 py-2 text-left last:border-0"
                     >
                       {c.image ? (
                         <Image
@@ -280,9 +276,7 @@ export function FormView({
                 <label className={`${labelClass} mb-0`}>
                   Cantidad a comprar *
                 </label>
-                <span className="bg-greenCustom-100 text-greenCustom-700 rounded-full px-2.5 py-0.5 text-xs font-bold">
-                  {qtyLabel}
-                </span>
+                <span className="chip chip-neutral">{qtyLabel}</span>
               </div>
               <input
                 className={inputClass}
@@ -305,10 +299,8 @@ export function FormView({
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, is_required: true })}
-                  className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-semibold transition-colors ${
-                    form.is_required
-                      ? "border-greenCustom-600 bg-greenCustom-700 text-white"
-                      : "border-border-soft bg-bg-card text-text-muted hover:border-greenCustom-300"
+                  className={`segmented-option flex-1 py-2 ${
+                    form.is_required ? "segmented-option-active" : ""
                   }`}
                 >
                   Requerido
@@ -316,10 +308,8 @@ export function FormView({
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, is_required: false })}
-                  className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border-[1.5px] py-2 text-sm font-semibold transition-colors ${
-                    !form.is_required
-                      ? "border-text-secondary bg-text-secondary text-white"
-                      : "border-border-soft bg-bg-card text-text-muted hover:border-border-default"
+                  className={`segmented-option flex-1 py-2 ${
+                    !form.is_required ? "segmented-option-muted-active" : ""
                   }`}
                 >
                   Opcional
@@ -336,10 +326,7 @@ export function FormView({
 
         {/* Buttons */}
         <div className="mt-1 flex gap-2.5">
-          <button
-            onClick={onCancel}
-            className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft flex-1 cursor-pointer rounded-xl border-[1.5px] py-2.5 text-sm font-semibold transition-all"
-          >
+          <button onClick={onCancel} className="button-secondary flex-1">
             Cancelar
           </button>
           <button
@@ -348,7 +335,7 @@ export function FormView({
               onSave(form);
             }}
             disabled={!canSave}
-            className="bg-button-primary flex-2 cursor-pointer rounded-xl border-none py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="button-primary flex-2"
           >
             {initial ? "Guardar cambios" : "Agregar producto"}
           </button>

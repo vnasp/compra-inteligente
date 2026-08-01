@@ -66,10 +66,7 @@ export function InventarioView({
             {items.length} productos en tu lista
           </p>
         </div>
-        <button
-          onClick={onClearAll}
-          className="border-border-default text-text-secondary flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-        >
+        <button onClick={onClearAll} className="button-danger">
           <Trash2 className="h-4 w-4" strokeWidth={1.75} />
           Limpiar stock
         </button>
@@ -99,13 +96,13 @@ export function InventarioView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar producto..."
-            className="border-border-soft bg-bg-card text-text-primary focus:border-greenCustom-400 placeholder:text-text-muted w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm outline-none"
+            className="input-field placeholder:text-text-muted py-2.5 pr-4 pl-9"
           />
         </div>
       )}
 
       {/* Item list */}
-      <div className="border-border-soft bg-bg-card rounded-2xl border">
+      <div className="app-panel">
         {filtered.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-text-muted">Sin productos en esta categoría</p>
@@ -128,7 +125,7 @@ export function InventarioView({
             return (
               <div
                 key={item.id}
-                className="border-border-soft flex items-center gap-4 border-b px-4 py-3 last:border-0"
+                className="app-row flex items-center gap-4 border-b px-4 py-3 last:border-0"
               >
                 {/* Icon */}
                 <div
@@ -153,7 +150,7 @@ export function InventarioView({
                           const t = priceTrend(item.id, item.last_price);
                           return t ? (
                             <span
-                              className={`text-[10px] font-bold ${t.up ? "text-red-500" : "text-success"}`}
+                              className={`text-[10px] font-bold ${t.up ? "text-warning" : "text-success"}`}
                             >
                               {t.up ? "↑" : "↓"}
                               {Math.abs(t.diff)}%
@@ -171,7 +168,7 @@ export function InventarioView({
                     <span className="text-text-muted text-[11px]">
                       Te queda
                     </span>
-                    <div className="border-border-soft bg-bg-card flex items-center gap-1 rounded-full border px-1 py-0.5">
+                    <div className="app-row flex items-center gap-1 rounded-full border px-1 py-0.5">
                       <button
                         onClick={() => setRemaining(remaining - step)}
                         disabled={remaining <= 0}
@@ -209,8 +206,7 @@ export function InventarioView({
                     />
                   </div>
                   <span
-                    className="text-[11px] font-semibold"
-                    style={{ color: toBuy > 0 ? "#C2410C" : "#15803D" }}
+                    className={`text-[11px] font-semibold ${toBuy > 0 ? "text-warning" : "text-success"}`}
                   >
                     {toBuy > 0
                       ? `Comprar ${toBuy} ${unit}`
