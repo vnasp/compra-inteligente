@@ -223,26 +223,26 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar producto..."
-              className="border-border-soft bg-bg-card text-text-primary focus:border-greenCustom-400 placeholder:text-text-muted w-full rounded-xl border py-2.5 pr-4 pl-9 text-sm outline-none"
+              className="input-field placeholder:text-text-muted py-2.5 pr-4 pl-9"
             />
           </div>
         )}
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="border-greenCustom-200 bg-greenCustom-50 mb-3 flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5">
+          <div className="app-row mb-3 flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5">
             <Tag
-              className="text-greenCustom-700 h-4 w-4 shrink-0"
+              className="text-brand-700 h-4 w-4 shrink-0"
               strokeWidth={1.75}
             />
-            <span className="text-greenCustom-800 text-sm font-semibold">
+            <span className="text-text-primary text-sm font-semibold">
               {selectedIds.size} seleccionado{selectedIds.size !== 1 ? "s" : ""}
             </span>
-            <span className="text-greenCustom-400">→</span>
+            <span className="text-brand-400">→</span>
             <select
               value={bulkCategory}
               onChange={(e) => setBulkCategory(e.target.value)}
-              className="border-greenCustom-200 text-text-primary flex-1 cursor-pointer rounded-lg border bg-white px-2.5 py-1 text-sm outline-none"
+              className="input-field flex-1 cursor-pointer rounded-lg px-2.5 py-1"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -252,13 +252,13 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
             </select>
             <button
               onClick={handleBulkCategoryChange}
-              className="bg-greenCustom-700 cursor-pointer rounded-lg px-3 py-1 text-xs font-bold text-white transition-all hover:opacity-90"
+              className="button-secondary rounded-lg px-3 py-1 text-xs"
             >
               Cambiar
             </button>
             <button
               onClick={clearSelection}
-              className="text-text-muted hover:bg-greenCustom-100 hover:text-greenCustom-700 cursor-pointer rounded-lg p-1 transition-colors"
+              className="text-text-muted hover:bg-bg-soft hover:text-brand-700 cursor-pointer rounded-lg p-1 transition-colors"
               title="Limpiar selección"
             >
               <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -267,7 +267,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
         )}
 
         {/* Item list */}
-        <div className="border-border-soft bg-bg-card flex-1 overflow-y-auto rounded-2xl border">
+        <div className="app-panel flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="text-text-muted py-16 text-center text-sm">
               Sin productos en esta categoría
@@ -275,12 +275,12 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
           ) : (
             <>
               {/* Select-all row */}
-              <div className="border-border-soft flex items-center gap-3 border-b px-4 py-2">
+              <div className="app-row flex items-center gap-3 border-b px-4 py-2">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={toggleSelectAll}
-                  className="accent-greenCustom-700 h-4 w-4 cursor-pointer"
+                  className="accent-brand-700 h-4 w-4 cursor-pointer"
                 />
                 <span className="text-text-muted text-xs">
                   {allVisibleSelected
@@ -298,9 +298,9 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                   <div key={item.id}>
                     {/* Main row */}
                     <div
-                      className={`border-border-soft flex items-center gap-3 border-b px-4 py-3 transition-colors ${
+                      className={`app-row flex items-center gap-3 border-b px-4 py-3 ${
                         isChecked
-                          ? "bg-greenCustom-50"
+                          ? "app-row-selected"
                           : isEditing
                             ? "bg-bg-soft"
                             : ""
@@ -311,7 +311,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleSelect(item.id)}
-                        className="accent-greenCustom-700 h-4 w-4 shrink-0 cursor-pointer"
+                        className="accent-brand-700 h-4 w-4 shrink-0 cursor-pointer"
                       />
 
                       {/* Icon */}
@@ -349,8 +349,8 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                           }
                           className={`cursor-pointer rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${
                             item.is_required
-                              ? "bg-tag-essential-bg text-tag-essential-text hover:opacity-80"
-                              : "bg-bg-soft text-text-muted hover:text-text-primary"
+                              ? "chip chip-brand hover:opacity-80"
+                              : "chip chip-neutral hover:text-text-primary"
                           }`}
                         >
                           {item.is_required ? "Requerido" : "Opcional"}
@@ -362,7 +362,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                           title={isEditing ? "Deseleccionar" : "Editar"}
                           className={`cursor-pointer rounded-lg p-1.5 transition-colors ${
                             isEditing
-                              ? "bg-greenCustom-100 text-greenCustom-700"
+                              ? "bg-brand-100 text-brand-700"
                               : "text-text-muted hover:bg-bg-soft hover:text-text-primary"
                           }`}
                         >
@@ -371,7 +371,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
                         <button
                           onClick={() => handleDelete(item.id)}
                           title="Eliminar"
-                          className="text-text-muted cursor-pointer rounded-lg p-1.5 transition-colors hover:bg-red-50 hover:text-red-500"
+                          className="text-text-muted hover:bg-danger-bg hover:text-danger cursor-pointer rounded-lg p-1.5 transition-colors"
                         >
                           <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                         </button>
@@ -386,7 +386,7 @@ export function MiListaView({ items, setItems }: MiListaViewProps) {
       </div>
 
       {/* ── Right: always-visible form ── */}
-      <div className="border-border-soft bg-bg-card my-8 mr-8 w-80 shrink-0 overflow-y-auto rounded-2xl border">
+      <div className="app-panel my-8 mr-8 w-80 shrink-0 overflow-y-auto">
         <FormView
           key={editing?.id ?? `new-${formResetKey}`}
           initial={editing}

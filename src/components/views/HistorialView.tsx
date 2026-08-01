@@ -45,11 +45,11 @@ export function HistorialView({
             onClick={() => !closing && setConfirmOpen(false)}
             className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
           />
-          <div className="fixed top-1/2 left-1/2 z-201 w-[min(420px,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="app-modal fixed top-1/2 left-1/2 z-201 w-[min(420px,90vw)] -translate-x-1/2 -translate-y-1/2 p-6">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+              <div className="icon-box-warning flex h-10 w-10 shrink-0 items-center justify-center">
                 <AlertTriangle
-                  className="h-5 w-5 text-amber-500"
+                  className="text-warning h-5 w-5"
                   strokeWidth={2}
                 />
               </div>
@@ -68,14 +68,14 @@ export function HistorialView({
               <button
                 onClick={() => setConfirmOpen(false)}
                 disabled={closing}
-                className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50"
+                className="button-secondary"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmClose}
                 disabled={closing}
-                className="bg-button-primary cursor-pointer rounded-xl px-4 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                className="button-warning"
               >
                 {closing ? "Cerrando…" : "Cerrar mes"}
               </button>
@@ -93,27 +93,21 @@ export function HistorialView({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setConfirmOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-100"
+            className="button-warning"
           >
             <CalendarCheck className="h-4 w-4" strokeWidth={1.75} />
             Cerrar mes
           </button>
-          <button
-            onClick={onOpenAnalysis}
-            className="border-border-default bg-bg-card text-text-primary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
-          >
+          <button onClick={onOpenAnalysis} className="button-secondary">
             Análisis
           </button>
-          <button
-            onClick={onOpenPurchase}
-            className="bg-button-primary cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:opacity-90"
-          >
+          <button onClick={onOpenPurchase} className="button-primary">
             + Registrar Compra
           </button>
         </div>
       </div>
 
-      <div className="border-border-soft bg-bg-card rounded-2xl border">
+      <div className="app-panel">
         {cyclePurchases.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-text-muted text-sm">
@@ -125,10 +119,10 @@ export function HistorialView({
             {cyclePurchases.map((p) => (
               <div
                 key={p.id}
-                className="group border-border-soft flex items-center justify-between border-b px-6 py-4 last:border-0"
+                className="app-row group flex items-center justify-between border-b px-6 py-4 last:border-0"
               >
                 <div className="flex items-center gap-4">
-                  <div className="bg-greenCustom-100 flex h-10 w-10 items-center justify-center rounded-xl text-base">
+                  <div className="icon-box-neutral flex h-10 w-10 items-center justify-center text-base">
                     🛒
                   </div>
                   <div>
@@ -140,7 +134,7 @@ export function HistorialView({
                         {p.supermarket}
                       </span>
                       {p.tag && (
-                        <span className="text-greenCustom-600 text-xs">
+                        <span className="text-brand-700 text-xs">
                           · {p.tag}
                         </span>
                       )}
@@ -158,7 +152,7 @@ export function HistorialView({
                     <button
                       onClick={() => onDeletePurchase(p.id)}
                       title="Eliminar compra"
-                      className="text-text-muted cursor-pointer rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
+                      className="text-text-muted hover:bg-danger-bg hover:text-danger cursor-pointer rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </button>
@@ -166,7 +160,7 @@ export function HistorialView({
                 </div>
               </div>
             ))}
-            <div className="bg-bg-soft flex items-center justify-between rounded-b-2xl px-6 py-4">
+            <div className="app-row flex items-center justify-between px-6 py-4">
               <span className="text-text-secondary text-sm font-medium">
                 Total gastado
               </span>

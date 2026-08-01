@@ -68,14 +68,10 @@ export function AddPurchase({
     <>
       <div
         onClick={onClose}
-        className="fixed inset-0 z-200"
-        style={{
-          background: "rgba(12,74,110,0.25)",
-          backdropFilter: "blur(3px)",
-        }}
+        className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
       />
       <div
-        className="fixed z-201 flex flex-col rounded-2xl bg-white shadow-2xl"
+        className="app-modal fixed z-201 flex flex-col"
         style={{
           top: "50%",
           left: "50%",
@@ -84,22 +80,18 @@ export function AddPurchase({
         }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between rounded-t-2xl p-5"
-          style={{
-            background: "linear-gradient(135deg, #334155, #475569, #4F46E5)",
-          }}
-        >
+        <div className="app-modal-header flex items-center justify-between border-b p-5">
           <div>
-            <h2 className="text-lg font-black text-white">Registrar Compra</h2>
-            <p className="mt-0.5 text-sm text-white/80">
+            <h2 className="text-text-primary text-lg font-black">
+              Registrar Compra
+            </h2>
+            <p className="text-text-muted mt-0.5 text-sm">
               Ingresa el total gastado
             </p>
           </div>
           <button
             onClick={onClose}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-xl text-white"
-            style={{ background: "rgba(255,255,255,0.2)", border: "none" }}
+            className="text-text-muted hover:bg-bg-soft hover:text-text-primary flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-xl"
           >
             ×
           </button>
@@ -109,7 +101,7 @@ export function AddPurchase({
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
           {/* Monto */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+            <label className="text-text-muted mb-1 block text-xs font-semibold uppercase">
               Monto Total (CLP)
             </label>
             <input
@@ -120,19 +112,19 @@ export function AddPurchase({
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Ej: 85000"
               required
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="input-field px-4 py-2.5 font-semibold"
             />
           </div>
 
           {/* Supermercado */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+            <label className="text-text-muted mb-1 block text-xs font-semibold uppercase">
               Supermercado
             </label>
             <select
               value={supermarket}
               onChange={(e) => setSupermarket(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="input-field px-4 py-2.5"
             >
               {options.map((s) => (
                 <option key={s} value={s}>
@@ -144,20 +136,20 @@ export function AddPurchase({
 
           {/* Fecha */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+            <label className="text-text-muted mb-1 block text-xs font-semibold uppercase">
               Fecha
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="input-field px-4 py-2.5"
             />
           </div>
 
           {/* Tag */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+            <label className="text-text-muted mb-1 block text-xs font-semibold uppercase">
               Etiqueta (opcional)
             </label>
             <input
@@ -165,19 +157,19 @@ export function AddPurchase({
               value={tag}
               onChange={(e) => setTag(e.target.value)}
               placeholder="Ej: Compra Mensual"
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="input-field px-4 py-2.5"
             />
           </div>
 
           {saveError && (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
+            <p className="bg-danger-bg text-danger rounded-xl px-3 py-2 text-xs">
               {saveError}
             </p>
           )}
           <button
             type="submit"
             disabled={saving || !amount}
-            className="mt-1 w-full cursor-pointer rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="button-primary mt-1 w-full"
           >
             {saving ? "Guardando…" : "Registrar"}
           </button>

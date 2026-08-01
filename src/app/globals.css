@@ -1,70 +1,614 @@
 @import "tailwindcss";
 
 @theme {
-  /* Backgrounds */
-  --color-bg-app: #f5f5f5;
-  --color-bg-surface: #fafafa;
-  --color-bg-soft: #eeeeee;
+  /* ==========================================================
+     BRAND
+     ========================================================== */
+
+  /* Color corporativo.
+     Uso:
+     - Sidebar activa
+     - Logo
+     - Botón principal
+     - Links
+     - Checkbox/radio activos
+     - Focus ring
+  */
+
+  --color-brand-900: #45111f;
+  --color-brand-800: #5c1729;
+  --color-brand-700: #7a2038; /* Principal */
+  --color-brand-600: #963049;
+  --color-brand-500: #b34761;
+  --color-brand-400: #cb768d;
+  --color-brand-300: #dfaebb;
+  --color-brand-200: #f0d9df;
+  --color-brand-100: #faf4f5;
+  --color-brand-50: #fdfafb;
+
+  /* ==========================================================
+     SUCCESS
+     ========================================================== */
+
+  /* Nunca usar como color de marca.
+     Sólo comunicar:
+     - ahorro
+     - éxito
+     - mejor precio
+     - producto comprado
+     - progreso positivo
+  */
+
+  --color-success-700: #2f7d49;
+  --color-success-600: #3f8f5a;
+  --color-success-500: #53a86d;
+  --color-success-100: #edf7f0;
+  --color-success-50: #f8fcf9;
+
+  /* ==========================================================
+     WARNING
+     ========================================================== */
+
+  /* Sólo advertencias */
+
+  --color-warning-700: #8d611d;
+  --color-warning-600: #b68a2f;
+  --color-warning-100: #faf3e3;
+
+  /* ==========================================================
+     DANGER
+     ========================================================== */
+
+  --color-danger-700: #b44747;
+  --color-danger-600: #c95d5d;
+  --color-danger-100: #fbecec;
+
+  /* ==========================================================
+     INFORMATION
+     ========================================================== */
+
+  --color-info-700: #567998;
+  --color-info-100: #eef5f9;
+
+  /* ==========================================================
+     BACKGROUNDS
+     ========================================================== */
+
+  /* Fondo aplicación */
+  --color-bg-app: #f7f7f5;
+
+  /* Paneles */
+  --color-bg-panel: #fafaf8;
+  --color-bg-surface: var(--color-bg-panel);
+
+  /* Cards */
   --color-bg-card: #ffffff;
 
-  /* Primary brand ramp — burdeo/vino (antes verde; se cambió para no imitar el
-     branding de Supermercado, el super que scrapeamos). El nombre del token se mantiene
-     por compatibilidad con las clases existentes. */
-  --color-greenCustom-900: #45111f;
-  --color-greenCustom-800: #5c1729;
-  --color-greenCustom-700: #7a2038;
-  --color-greenCustom-600: #963049;
-  --color-greenCustom-500: #b34761;
-  --color-greenCustom-400: #c9738a;
-  --color-greenCustom-300: #dda3b3;
-  --color-greenCustom-200: #eecdd6;
-  --color-greenCustom-100: #f9eef1;
-  --color-greenCustom-50: #fcf6f8;
+  /* Hover */
+  --color-bg-hover: #f3f3f1;
+  --color-bg-soft: var(--color-bg-hover);
 
-  /* Accent / Neutral */
-  --color-accent-beige: #e5e5e5;
-  --color-accent-sand: #d4d4d4;
-  --color-accent-cream: #f5f5f5;
-  --color-accent-gold-soft: #c9a86a;
+  /* Inputs */
+  --color-bg-input: #fcfcfb;
 
-  /* Semantic — success sigue siendo verde a propósito: "positivo/ahorro/sano"
-     debe leerse distinto del coral de marca y del rojo/ámbar de alerta. */
-  --color-success: #2d9363;
-  --color-success-bg: #e7f1ea;
-  --color-success-border: #b9dbc7;
-  --color-warning: #d89b4d;
-  --color-danger: #d96c6c;
-  --color-info: #6a8da8;
+  /* ==========================================================
+     TEXT
+     ========================================================== */
 
-  /* Text */
-  --color-text-primary: #1f2a24;
-  --color-text-secondary: #5f6b63;
-  --color-text-muted: #8a948d;
+  --color-text-primary: #252525;
+  --color-text-secondary: #666666;
+  --color-text-muted: #959595;
+  --color-text-disabled: #b5b5b5;
   --color-text-inverse: #ffffff;
 
-  /* Borders */
-  --color-border-soft: #e5e5e5;
-  --color-border-default: #d4d4d4;
+  /* ==========================================================
+     BORDERS
+     ========================================================== */
 
-  /* Buttons */
-  --color-button-primary: #7a2038;
-  --color-button-primary-hover: #5c1729;
-  --color-button-secondary: #f9eef1;
+  --color-border-light: #ece8e2;
+  --color-border-default: #ddd8d2;
+  --color-border-strong: #c9c3bc;
+  --color-border-soft: var(--color-border-light);
+
+  /* ==========================================================
+     BUTTONS
+     ========================================================== */
+
+  /* Acción principal */
+  --color-button-primary: var(--color-brand-700);
+  --color-button-primary-hover: var(--color-brand-800);
+
+  /* Acción secundaria */
+  --color-button-secondary: #ffffff;
+  --color-button-secondary-hover: var(--color-bg-hover);
+  --color-button-secondary-border: var(--color-border-default);
+
+  /* Acciones positivas */
+  --color-button-success: var(--color-success-600);
+  --color-button-success-hover: var(--color-success-700);
+
+  /* Shorthands semánticos para uso directo en Tailwind */
+  --color-success: var(--color-success-600);
+  --color-success-bg: var(--color-success-100);
+  --color-success-border: #bddfc7;
+  --color-warning: var(--color-warning-600);
+  --color-warning-bg: var(--color-warning-100);
+  --color-warning-border: #ead19a;
+  --color-danger: var(--color-danger-600);
+  --color-danger-bg: var(--color-danger-100);
+  --color-danger-border: #efc6c6;
+  --color-info: var(--color-info-700);
+  --color-info-bg: var(--color-info-100);
+
+  /* ==========================================================
+     BADGES
+     ========================================================== */
+
+  /* Marca */
+  --color-badge-brand-bg: var(--color-brand-100);
+  --color-badge-brand-text: var(--color-brand-700);
+
+  /* Éxito */
+  --color-badge-success-bg: var(--color-success-100);
+  --color-badge-success-text: var(--color-success-700);
+
+  /* Advertencia */
+  --color-badge-warning-bg: var(--color-warning-100);
+  --color-badge-warning-text: var(--color-warning-700);
+
+  /* Error */
+  --color-badge-danger-bg: var(--color-danger-100);
+  --color-badge-danger-text: var(--color-danger-700);
 
   /* Tags */
-  --color-tag-essential-bg: #fce8e6;
-  --color-tag-essential-text: #c94f4f;
+  --color-tag-essential-bg: var(--color-badge-brand-bg);
+  --color-tag-essential-text: var(--color-badge-brand-text);
+  --color-tag-important-bg: var(--color-badge-warning-bg);
+  --color-tag-important-text: var(--color-badge-warning-text);
+  --color-tag-optional-bg: var(--color-badge-success-bg);
+  --color-tag-optional-text: var(--color-badge-success-text);
 
-  --color-tag-important-bg: #f8efd9;
-  --color-tag-important-text: #a8741a;
+  /* Acentos heredados, normalizados a semántica */
+  --color-accent-beige: var(--color-border-default);
+  --color-accent-cream: var(--color-bg-card);
+  --color-accent-gold-soft: var(--color-warning-100);
 
-  --color-tag-optional-bg: #e7f1ea;
-  --color-tag-optional-text: #2d9363;
+  /* ==========================================================
+     CHARTS
+     ========================================================== */
+
+  --color-chart-budget: var(--color-brand-700);
+  --color-chart-savings: var(--color-success-600);
+  --color-chart-warning: var(--color-warning-600);
+  --color-chart-danger: var(--color-danger-600);
 }
 
 body {
   background: var(--color-bg-app);
-  color: var(--color-foreground);
+  color: var(--color-text-primary);
   font-family: var(--color-font-interSerif-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .button-primary,
+  .button-secondary,
+  .button-success,
+  .button-warning,
+  .button-danger {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.75rem;
+    border-width: 1px;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .button-primary:disabled,
+  .button-secondary:disabled,
+  .button-success:disabled,
+  .button-warning:disabled,
+  .button-danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .button-primary {
+    border-color: transparent;
+    background: var(--color-button-primary);
+    color: var(--color-text-inverse);
+  }
+
+  .button-primary:hover:not(:disabled) {
+    background: var(--color-button-primary-hover);
+  }
+
+  .button-secondary {
+    border-color: var(--color-button-secondary-border);
+    background: var(--color-button-secondary);
+    color: var(--color-brand-700);
+  }
+
+  .button-secondary:hover:not(:disabled) {
+    border-color: var(--color-brand-200);
+    background: var(--color-brand-50);
+    color: var(--color-brand-800);
+  }
+
+  .button-success {
+    border-color: transparent;
+    background: var(--color-button-success);
+    color: var(--color-text-inverse);
+  }
+
+  .button-success:hover:not(:disabled) {
+    background: var(--color-button-success-hover);
+  }
+
+  .button-warning {
+    border-color: var(--color-warning-border);
+    background: var(--color-bg-card);
+    color: var(--color-warning);
+  }
+
+  .button-warning:hover:not(:disabled) {
+    background: var(--color-warning-bg);
+  }
+
+  .button-danger {
+    border-color: var(--color-danger-border);
+    background: var(--color-bg-card);
+    color: var(--color-danger-700);
+  }
+
+  .button-danger:hover:not(:disabled) {
+    background: var(--color-danger-bg);
+  }
+
+  .input-field {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .input-field:focus {
+    border-color: var(--color-brand-400);
+  }
+
+  .app-card,
+  .app-panel,
+  .app-modal,
+  .stat-card,
+  .stat-card-premium {
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-bg-card);
+    box-shadow: 0 1px 2px rgb(37 37 37 / 0.04);
+  }
+
+  .app-card {
+    border-radius: 1rem;
+    padding: 1.25rem;
+  }
+
+  .app-panel {
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  .app-modal {
+    border-radius: 1rem;
+    box-shadow:
+      0 24px 48px rgb(37 37 37 / 0.16),
+      0 4px 12px rgb(37 37 37 / 0.08);
+  }
+
+  .app-modal-header,
+  .app-modal-footer {
+    border-color: var(--color-border-soft);
+    background: var(--color-bg-card);
+  }
+
+  .app-row {
+    border-color: var(--color-border-soft);
+    background: var(--color-bg-card);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .app-row:hover {
+    background: var(--color-bg-hover);
+  }
+
+  .app-row-selected {
+    background: var(--color-brand-50);
+  }
+
+  .stat-card {
+    border-radius: 1rem;
+    padding: 1.25rem;
+  }
+
+  .stat-card-premium {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow:
+      0 10px 28px rgb(37 37 37 / 0.07),
+      0 1px 2px rgb(37 37 37 / 0.04);
+  }
+
+  .stat-card-premium::after {
+    position: absolute;
+    right: 1rem;
+    bottom: 0.75rem;
+    left: 1rem;
+    height: 3px;
+    border-radius: 9999px;
+    background: var(--color-success);
+    content: "";
+  }
+
+  .icon-box,
+  .icon-box-brand,
+  .icon-box-success,
+  .icon-box-warning,
+  .icon-box-neutral,
+  .icon-box-danger {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+  }
+
+  .icon-box {
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+
+  .icon-box-brand {
+    background: var(--color-brand-100);
+    color: var(--color-brand-700);
+  }
+
+  .icon-box-success {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+  }
+
+  .icon-box-warning {
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+  }
+
+  .icon-box-danger {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+  }
+
+  .icon-box-neutral {
+    background: var(--color-bg-hover);
+    color: var(--color-text-muted);
+  }
+
+  .badge-brand,
+  .badge-success,
+  .badge-warning,
+  .badge-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+  }
+
+  .badge-brand {
+    background: var(--color-badge-brand-bg);
+    color: var(--color-badge-brand-text);
+  }
+
+  .badge-success {
+    background: var(--color-badge-success-bg);
+    color: var(--color-badge-success-text);
+  }
+
+  .badge-warning {
+    background: var(--color-badge-warning-bg);
+    color: var(--color-badge-warning-text);
+  }
+
+  .badge-danger {
+    background: var(--color-badge-danger-bg);
+    color: var(--color-badge-danger-text);
+  }
+
+  .chip,
+  .chip-brand,
+  .chip-success,
+  .chip-warning,
+  .chip-danger,
+  .chip-neutral {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+  }
+
+  .chip {
+    padding: 0.125rem 0.5rem;
+  }
+
+  .chip-brand {
+    color: var(--color-brand-700);
+  }
+
+  .chip-success {
+    color: var(--color-success);
+  }
+
+  .chip-warning {
+    color: var(--color-warning);
+  }
+
+  .chip-danger {
+    color: var(--color-danger);
+  }
+
+  .chip-neutral {
+    color: var(--color-text-muted);
+  }
+
+  .section-action-card {
+    border: 1px solid var(--color-border-soft);
+    border-radius: 1rem;
+    background: var(--color-bg-card);
+    box-shadow: 0 1px 2px rgb(37 37 37 / 0.04);
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .section-action-card:hover {
+    border-color: var(--color-brand-200);
+    background: var(--color-bg-hover);
+    box-shadow: 0 6px 18px rgb(37 37 37 / 0.06);
+  }
+
+  .segmented-option {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 0.75rem;
+    background: var(--color-bg-card);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .segmented-option:hover {
+    border-color: var(--color-brand-300);
+    color: var(--color-brand-700);
+  }
+
+  .segmented-option-active {
+    border-color: var(--color-brand-600);
+    background: var(--color-brand-700);
+    color: var(--color-text-inverse);
+  }
+
+  .segmented-option-muted-active {
+    border-color: var(--color-border-strong);
+    background: var(--color-text-secondary);
+    color: var(--color-text-inverse);
+  }
+
+  .sidebar-shell {
+    border-right: 1px solid var(--color-border-soft);
+    background: var(--color-bg-panel);
+  }
+
+  .sidebar-nav-item {
+    display: flex;
+    width: 100%;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .sidebar-nav-item:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-brand-700);
+  }
+
+  .sidebar-nav-item-active {
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
+    font-weight: 700;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .flow-step-marker {
+    display: inline-flex;
+    height: 1.25rem;
+    width: 1.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border-default);
+    border-radius: 9999px;
+    background: var(--color-bg-card);
+    color: var(--color-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 800;
+  }
+
+  .flow-step-completed {
+    color: var(--color-text-primary);
+  }
+
+  .flow-step-completed .flow-step-marker {
+    border-color: var(--color-success-border);
+    background: var(--color-bg-card);
+    color: var(--color-success);
+  }
+
+  .flow-step-current {
+    color: var(--color-text-muted);
+  }
+
+  .flow-step-current .flow-step-marker {
+    border-color: var(--color-border-default);
+    background: var(--color-bg-card);
+    color: var(--color-text-muted);
+  }
+
+  .flow-step-pending {
+    color: var(--color-text-muted);
+  }
 }

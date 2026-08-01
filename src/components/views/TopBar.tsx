@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet, CircleCheck, CalendarPlus } from "lucide-react";
+import { Wallet, CircleCheck, CalendarPlus, Plus } from "lucide-react";
 import { openGoogleCalendar } from "@/utils/dates";
 
 interface TopBarProps {
@@ -29,11 +29,14 @@ export function TopBar({
   nextShoppingDateISO,
 }: TopBarProps) {
   return (
-    <div className="border-border-soft bg-bg-card mx-6 mt-5 mb-1 flex shrink-0 items-center rounded-2xl border px-6 py-4">
+    <div className="app-card mx-6 mt-5 mb-1 flex shrink-0 items-center px-6 py-4">
       {/* Presupuesto disponible */}
       <div className="flex items-center gap-3 pr-6">
-        <div className="bg-greenCustom-100 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-          <Wallet className="text-greenCustom-700 h-5 w-5" strokeWidth={1.75} />
+        <div className="icon-box-neutral flex h-10 w-10 shrink-0 items-center justify-center">
+          <Wallet
+            className="lucide lucide-calendar-plus h-5 w-5"
+            strokeWidth={1.75}
+          />
         </div>
         <div>
           <p className="text-text-muted text-xs">Presupuesto disponible</p>
@@ -65,7 +68,7 @@ export function TopBar({
       {/* Último scraping */}
       <div className="flex items-center gap-2.5 px-2">
         <CircleCheck
-          className={`h-6 w-6 shrink-0 ${lastScrapeTs ? "text-greenCustom-600" : "text-text-muted"}`}
+          className={`h-6 w-6 shrink-0 ${lastScrapeTs ? "text-success" : "text-text-muted"}`}
           strokeWidth={1.75}
         />
         <div>
@@ -82,11 +85,8 @@ export function TopBar({
 
       {/* Próxima compra */}
       <div className="flex items-center gap-2.5 pl-2">
-        <div className="bg-greenCustom-100 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-          <CalendarPlus
-            className="text-greenCustom-700 h-5 w-5"
-            strokeWidth={1.75}
-          />
+        <div className="icon-box-neutral flex h-10 w-10 shrink-0 items-center justify-center">
+          <CalendarPlus className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div>
           <p className="text-text-muted text-xs">Próxima compra</p>
@@ -98,9 +98,9 @@ export function TopBar({
           <button
             onClick={() => openGoogleCalendar(nextShoppingDateISO)}
             title="Agregar al Calendario"
-            className="border-border-soft bg-bg-soft text-text-muted hover:border-greenCustom-200 hover:bg-greenCustom-100 hover:text-greenCustom-700 ml-1 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all"
+            className="button-secondary ml-1 h-6 w-6 shrink-0 p-0"
           >
-            <CalendarPlus className="h-4 w-4" strokeWidth={1.75} />
+            <Plus className="h-4 w-4" strokeWidth={1.75} />
           </button>
         )}
       </div>

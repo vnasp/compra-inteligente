@@ -48,17 +48,17 @@ export function ShoppingAnalysis({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+        className="app-modal w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">
+          <h2 className="text-text-primary text-lg font-bold">
             Análisis de Gasto
           </h2>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="text-text-muted hover:bg-bg-soft hover:text-text-primary flex h-7 w-7 cursor-pointer items-center justify-center rounded-full"
           >
             ✕
           </button>
@@ -74,11 +74,11 @@ export function ShoppingAnalysis({
               value: knapsackResult ? formatPrice(totalOptimal) : "—",
             },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl bg-slate-50 p-3 text-center">
-              <p className="mb-0.5 text-[10px] tracking-wide text-slate-400 uppercase">
+            <div key={label} className="stat-card p-3 text-center">
+              <p className="text-text-muted mb-0.5 text-[10px] tracking-wide uppercase">
                 {label}
               </p>
-              <p className="text-sm font-bold text-slate-800">{value}</p>
+              <p className="text-text-primary text-sm font-bold">{value}</p>
             </div>
           ))}
         </div>
@@ -86,14 +86,14 @@ export function ShoppingAnalysis({
         {/* Barra de presupuesto gastado */}
         {monthlyBudget > 0 && (
           <div className="mb-5">
-            <div className="mb-1 flex justify-between text-[11px] text-slate-400">
+            <div className="text-text-muted mb-1 flex justify-between text-[11px]">
               <span>Gastado del mes</span>
               <span>{Math.round((monthSpent / monthlyBudget) * 100)}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="bg-bg-soft h-2 overflow-hidden rounded-full">
               <div
                 className={`h-full rounded-full transition-all ${
-                  monthSpent > monthlyBudget ? "bg-red-500" : "bg-indigo-500"
+                  monthSpent > monthlyBudget ? "bg-danger" : "bg-brand-700"
                 }`}
                 style={{
                   width: `${Math.min((monthSpent / monthlyBudget) * 100, 100)}%`,
@@ -104,16 +104,16 @@ export function ShoppingAnalysis({
         )}
 
         {/* Barras por categoría */}
-        <p className="mb-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+        <p className="text-text-muted mb-3 text-[11px] font-bold tracking-wider uppercase">
           Lista óptima por categoría
         </p>
 
         {!knapsackResult ? (
-          <p className="py-4 text-center text-sm text-slate-400">
+          <p className="text-text-muted py-4 text-center text-sm">
             Genera la lista óptima primero para ver el desglose
           </p>
         ) : sorted.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">
+          <p className="text-text-muted py-4 text-center text-sm">
             Sin datos de precios en la lista óptima
           </p>
         ) : (
@@ -125,17 +125,19 @@ export function ShoppingAnalysis({
               return (
                 <div key={category}>
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-600">
+                    <span className="text-text-secondary text-[11px]">
                       {meta.icon} {category}
                     </span>
-                    <span className="text-[11px] font-bold text-slate-700">
+                    <span className="text-text-primary text-[11px] font-bold">
                       {formatPrice(cost)}{" "}
-                      <span className="font-normal text-slate-400">{pct}%</span>
+                      <span className="text-text-muted font-normal">
+                        {pct}%
+                      </span>
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="bg-bg-soft h-1.5 overflow-hidden rounded-full">
                     <div
-                      className="h-full rounded-full bg-indigo-500"
+                      className="bg-brand-700 h-full rounded-full"
                       style={{ width: `${barWidth}%` }}
                     />
                   </div>

@@ -3,20 +3,24 @@
 import { useState } from "react";
 import {
   CircleCheck,
-  RefreshCw,
   Sparkles as SparklesIcon,
-  ShoppingCart,
   ExternalLink,
   Check,
   Bookmark,
   X,
 } from "lucide-react";
 import { CATEGORY_META } from "@/components/shopping-list/constants";
+import {
+  PurchaseFlowCard,
+  type FlowStep,
+  type PurchasePhase,
+} from "@/components/PurchaseFlowCard";
 import { suggestedQty, formatPrice } from "@/utils/stock";
 import type { KnapsackItem, KnapsackResult } from "@/utils/knapsack";
 import { buildCartBookmarklet, CART_BOOKMARK_NAME } from "@/utils/jumbo";
 import type { ShoppingListItem, PriceHistorySummary } from "@/types/shopping";
 import { useToast } from "@/components/ui/Toast";
+import { PRICE_FRESH_HOURS } from "@/config";
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -45,7 +49,10 @@ interface OptimizacionViewProps {
   onSaveCartSnapshot: (
     rows: { skuId: string; quantity: number }[],
   ) => void | Promise<void>;
+  onResetCurrentPurchase: () => void;
+  onOpenInventory: () => void;
   onOpenList: () => void;
+  onOpenHistory: () => void;
 }
 
 export function OptimizacionView({
@@ -62,7 +69,10 @@ export function OptimizacionView({
   onShareWhatsApp,
   onMarkPurchased,
   onSaveCartSnapshot,
+  onResetCurrentPurchase,
+  onOpenInventory,
   onOpenList,
+  onOpenHistory,
 }: OptimizacionViewProps) {
   const toast = useToast();
   const [expandedSection, setExpandedSection] = useState<
@@ -73,6 +83,8 @@ export function OptimizacionView({
   // item_id → comprado (true) / no había (false)
   const [markState, setMarkState] = useState<Record<string, boolean>>({});
   const [marking, setMarking] = useState(false);
+  const [cartPrepared, setCartPrepared] = useState(false);
+  const [purchaseCompleted, setPurchaseCompleted] = useState(false);
 
   const qtyOf = (item: ShoppingListItem) =>
     suggestedQty(
@@ -104,6 +116,14 @@ export function OptimizacionView({
     const drop = hist.prevPrice - item.last_price;
     return drop > 0 ? sum + drop * qtyOf(item) : sum;
   }, 0);
+  const currentPurchaseItems = items.filter((item) => qtyOf(item) > 0);
+  const freshPriceCutoff = Date.now() - PRICE_FRESH_HOURS * 3600_000;
+  const stalePriceCount = currentPurchaseItems.filter(
+    (item) =>
+      !item.price_updated_at ||
+      new Date(item.price_updated_at).getTime() < freshPriceCutoff,
+  ).length;
+  const pricesReady = currentPurchaseItems.length > 0 && stalePriceCount === 0;
 
   // Items de la lista óptima que se pueden marcar como comprados
   const markableItems: KnapsackItem[] = displayResult
@@ -131,6 +151,8 @@ export function OptimizacionView({
       toast.success(
         `${rows.length} producto${rows.length !== 1 ? "s" : ""} marcado${rows.length !== 1 ? "s" : ""} como comprado${rows.length !== 1 ? "s" : ""}`,
       );
+      setCartPrepared(true);
+      setPurchaseCompleted(true);
       setMarkOpen(false);
     } catch {
       toast.error("No se pudo registrar la compra");
@@ -198,6 +220,201 @@ export function OptimizacionView({
     openJumboCart();
   };
 
+  const handleGenerate = () => {
+    setCartPrepared(false);
+    setPurchaseCompleted(false);
+    onGenerateOptimal();
+  };
+
+  const handleCartPrepared = () => {
+    setCartPrepared(true);
+    setCartHelpOpen(false);
+  };
+
+  const handleNewPurchase = () => {
+    setCartPrepared(false);
+    setPurchaseCompleted(false);
+    setBookmarkletCopied(false);
+    setSnapshotSaved(false);
+    onResetCurrentPurchase();
+  };
+
+  const purchasePhase: PurchasePhase = !displayResult
+    ? "prepare"
+    : purchaseCompleted
+      ? "completed"
+      : cartPrepared
+        ? "cart"
+        : "proposal";
+
+  const prepareNeedsPrices =
+    purchasePhase === "prepare" &&
+    currentPurchaseItems.length > 0 &&
+    !pricesReady;
+  const prepareHasNoProducts =
+    purchasePhase === "prepare" && items.length === 0;
+  const prepareHasNoPendingProducts =
+    purchasePhase === "prepare" &&
+    items.length > 0 &&
+    currentPurchaseItems.length === 0;
+  const prepareTitle = prepareNeedsPrices
+    ? "Actualiza precios antes de optimizar"
+    : prepareHasNoProducts
+      ? "Agrega productos a tu lista"
+      : prepareHasNoPendingProducts
+        ? "No hay productos pendientes"
+        : "Prepara tu próxima compra";
+  const prepareDescription = prepareNeedsPrices
+    ? `${stalePriceCount} producto${stalePriceCount !== 1 ? "s tienen" : " tiene"} precios vencidos o sin precio. Actualízalos para generar una propuesta confiable.`
+    : prepareHasNoProducts
+      ? "Crea una lista con los productos que podrías necesitar para iniciar el flujo de compra."
+      : prepareHasNoPendingProducts
+        ? "Tu inventario y compras del ciclo indican que no necesitas comprar productos por ahora."
+        : "Revisa inventario y lista si hace falta. Cuando estés lista, genera una propuesta optimizada.";
+  const prepareCtaLabel = prepareNeedsPrices
+    ? scraping
+      ? "Actualizando..."
+      : "Actualizar precios"
+    : prepareHasNoProducts
+      ? "Editar lista"
+      : prepareHasNoPendingProducts
+        ? "Revisar inventario"
+        : "Generar Lista Óptima";
+
+  const flowSteps: FlowStep[] = [
+    {
+      label: "Lista inicial",
+      status:
+        items.length > 0
+          ? "completed"
+          : purchasePhase === "prepare"
+            ? "current"
+            : "pending",
+    },
+    {
+      label: "Inventario revisado",
+      status: Object.keys(stockRemaining).length > 0 ? "completed" : "current",
+    },
+    {
+      label: "Precios actualizados",
+      status: pricesReady
+        ? "completed"
+        : currentPurchaseItems.length > 0
+          ? "current"
+          : "pending",
+    },
+    {
+      label: "Optimización generada",
+      status: displayResult ? "completed" : pricesReady ? "current" : "pending",
+    },
+    {
+      label: purchaseCompleted
+        ? "Compra realizada"
+        : cartPrepared
+          ? "Completar compra"
+          : "Llenar el carro",
+      status: purchaseCompleted
+        ? "completed"
+        : displayResult
+          ? "current"
+          : "pending",
+    },
+  ];
+
+  const flowCopy: Record<
+    PurchasePhase,
+    {
+      title: string;
+      description: string;
+      statusLabel: string;
+      ctaLabel: string;
+    }
+  > = {
+    prepare: {
+      statusLabel: "Compra pendiente",
+      title: prepareTitle,
+      description: prepareDescription,
+      ctaLabel: prepareCtaLabel,
+    },
+    proposal: {
+      statusLabel: "Optimización generada",
+      title: "Revisa la propuesta",
+      description:
+        "Ya tienes una lista sugerida. El siguiente paso es llevarla al carro del supermercado.",
+      ctaLabel: "Llenar carro",
+    },
+    cart: {
+      statusLabel: "Carro listo",
+      title: "Completa la compra",
+      description:
+        "Cuando hayas terminado la compra, marca los productos como comprados para actualizar el historial.",
+      ctaLabel: "Completar compra",
+    },
+    completed: {
+      statusLabel: "Compra completada",
+      title: "Compra registrada",
+      description:
+        "La compra quedó marcada. Puedes revisar el historial o empezar una nueva compra.",
+      ctaLabel: "Crear nueva compra",
+    },
+  };
+
+  const secondaryActions =
+    purchasePhase === "prepare"
+      ? [
+          { label: "Revisar inventario", onClick: onOpenInventory },
+          { label: "Editar lista", onClick: onOpenList },
+        ]
+      : purchasePhase === "proposal" && displayResult
+        ? [
+            { label: "Recalcular", onClick: handleGenerate },
+            {
+              label: "Compartir lista",
+              onClick: () => onShareWhatsApp(displayResult),
+            },
+            { label: "Editar lista", onClick: onOpenList },
+          ]
+        : purchasePhase === "cart" && displayResult
+          ? [
+              { label: "Llenar carro otra vez", onClick: handleFillCart },
+              {
+                label: "Compartir lista",
+                onClick: () => onShareWhatsApp(displayResult),
+              },
+            ]
+          : [
+              { label: "Revisar historial", onClick: onOpenHistory },
+              { label: "Actualizar inventario", onClick: onOpenInventory },
+            ];
+
+  const handlePrimaryAction = () => {
+    if (purchasePhase === "prepare") {
+      if (prepareHasNoProducts) {
+        onOpenList();
+        return;
+      }
+      if (currentPurchaseItems.length === 0) {
+        onOpenInventory();
+        return;
+      }
+      if (!pricesReady) {
+        onScrape();
+        return;
+      }
+      handleGenerate();
+      return;
+    }
+    if (purchasePhase === "proposal") {
+      handleFillCart();
+      return;
+    }
+    if (purchasePhase === "cart") {
+      openMark();
+      return;
+    }
+    handleNewPurchase();
+  };
+
   return (
     <div className="flex h-full gap-6 overflow-hidden p-6">
       {/* ── Modal: Marcar como comprado ──────────────────────────────────── */}
@@ -207,8 +424,8 @@ export function OptimizacionView({
             onClick={() => !marking && setMarkOpen(false)}
             className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
           />
-          <div className="border-border-soft bg-bg-card fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(520px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border shadow-2xl">
-            <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <div className="app-modal fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(520px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden">
+            <div className="app-modal-header flex shrink-0 items-center justify-between border-b px-6 py-4">
               <div>
                 <h2 className="text-text-primary text-base font-bold">
                   Marcar como comprado
@@ -226,7 +443,7 @@ export function OptimizacionView({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-3">
-              <div className="divide-border-soft flex flex-col divide-y">
+              <div className="flex flex-col">
                 {markableItems.map((k) => {
                   const fullItem = items.find((i) => i.id === k.id);
                   const meta = fullItem
@@ -235,7 +452,10 @@ export function OptimizacionView({
                     : null;
                   const bought = markState[k.id] ?? true;
                   return (
-                    <div key={k.id} className="flex items-center gap-3 py-2.5">
+                    <div
+                      key={k.id}
+                      className="app-row flex items-center gap-3 border-b py-2.5 last:border-0"
+                    >
                       {meta && (
                         <div
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm"
@@ -263,7 +483,7 @@ export function OptimizacionView({
                         }
                         className={`shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                           bought
-                            ? "bg-greenCustom-700 text-white hover:opacity-90"
+                            ? "bg-success text-white hover:opacity-90"
                             : "bg-bg-soft text-text-muted hover:bg-bg-soft"
                         }`}
                       >
@@ -275,7 +495,7 @@ export function OptimizacionView({
               </div>
             </div>
 
-            <div className="border-border-soft flex shrink-0 items-center justify-between gap-3 border-t px-6 py-4">
+            <div className="app-modal-footer flex shrink-0 items-center justify-between gap-3 border-t px-6 py-4">
               <p className="text-text-muted text-xs">
                 {markableItems.filter((k) => markState[k.id]).length} de{" "}
                 {markableItems.length} comprados
@@ -284,14 +504,14 @@ export function OptimizacionView({
                 <button
                   onClick={() => setMarkOpen(false)}
                   disabled={marking}
-                  className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50"
+                  className="button-secondary"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleConfirmMark}
                   disabled={marking}
-                  className="bg-button-primary cursor-pointer rounded-xl px-5 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                  className="button-success px-5 py-2"
                 >
                   {marking ? "Guardando…" : "Confirmar"}
                 </button>
@@ -308,8 +528,8 @@ export function OptimizacionView({
             onClick={() => setCartWarnOpen(false)}
             className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
           />
-          <div className="border-border-soft bg-bg-card fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border shadow-2xl">
-            <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <div className="app-modal fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden">
+            <div className="app-modal-header flex shrink-0 items-center justify-between border-b px-6 py-4">
               <div>
                 <h2 className="text-text-primary text-base font-bold">
                   Productos sin vincular a Supermercado
@@ -329,9 +549,12 @@ export function OptimizacionView({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-3">
-              <div className="divide-border-soft flex flex-col divide-y">
+              <div className="flex flex-col">
                 {unlinkedItems.map(({ k }) => (
-                  <div key={k.id} className="flex items-center gap-3 py-2">
+                  <div
+                    key={k.id}
+                    className="app-row flex items-center gap-3 border-b py-2 last:border-0"
+                  >
                     <span className="text-text-primary text-sm font-medium">
                       {k.name}
                     </span>
@@ -343,13 +566,13 @@ export function OptimizacionView({
               </div>
             </div>
 
-            <div className="border-border-soft flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
+            <div className="app-modal-footer flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
               <button
                 onClick={() => {
                   setCartWarnOpen(false);
                   onOpenList();
                 }}
-                className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
+                className="button-secondary"
               >
                 Ir a vincular
               </button>
@@ -359,7 +582,7 @@ export function OptimizacionView({
                   openJumboCart();
                 }}
                 disabled={linkedRows.length === 0}
-                className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#1fa02e] px-5 py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                className="button-success px-5 py-2"
               >
                 <ExternalLink className="h-4 w-4" strokeWidth={2} />
                 Continuar con {linkedRows.length}
@@ -376,8 +599,8 @@ export function OptimizacionView({
             onClick={() => setCartHelpOpen(false)}
             className="fixed inset-0 z-200 bg-black/30 backdrop-blur-sm"
           />
-          <div className="border-border-soft bg-bg-card fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border shadow-2xl">
-            <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <div className="app-modal fixed top-1/2 left-1/2 z-201 flex max-h-[85vh] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden">
+            <div className="app-modal-header flex shrink-0 items-center justify-between border-b px-6 py-4">
               <div>
                 <h2 className="text-text-primary text-base font-bold">
                   Llenar el carro con {linkedRows.length} producto
@@ -403,13 +626,13 @@ export function OptimizacionView({
               <div
                 className={`rounded-xl border p-4 ${
                   canUseBookmarklet
-                    ? "border-greenCustom-200 bg-greenCustom-50"
+                    ? "border-brand-200 bg-bg-card"
                     : "border-border-soft bg-bg-soft"
                 }`}
               >
                 <div className="mb-2 flex items-center gap-2">
                   <Bookmark
-                    className="text-greenCustom-700 h-4 w-4 shrink-0"
+                    className="text-brand-700 h-4 w-4 shrink-0"
                     strokeWidth={2}
                   />
                   <h3 className="text-text-primary text-sm font-bold">
@@ -453,12 +676,15 @@ export function OptimizacionView({
               </p>
             </div>
 
-            <div className="border-border-soft flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
+            <div className="app-modal-footer flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
               <button
                 onClick={() => setCartHelpOpen(false)}
-                className="border-border-soft bg-bg-card text-text-secondary hover:bg-bg-soft cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition-all"
+                className="button-secondary"
               >
                 Cerrar
+              </button>
+              <button onClick={handleCartPrepared} className="button-success">
+                Ya llené el carro
               </button>
               {canUseBookmarklet && (
                 <button
@@ -471,10 +697,10 @@ export function OptimizacionView({
                       setBookmarkletCopied,
                     )
                   }
-                  className={`flex cursor-pointer items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-bold text-white transition-all ${
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-bold transition-all ${
                     bookmarkletCopied
-                      ? "bg-success"
-                      : "bg-button-primary hover:opacity-90"
+                      ? "bg-success text-white"
+                      : "button-secondary"
                   }`}
                 >
                   {bookmarkletCopied ? (
@@ -496,27 +722,36 @@ export function OptimizacionView({
 
       {/* ── Columna principal ──────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+        <PurchaseFlowCard
+          phase={purchasePhase}
+          title={flowCopy[purchasePhase].title}
+          description={flowCopy[purchasePhase].description}
+          statusLabel={flowCopy[purchasePhase].statusLabel}
+          steps={flowSteps}
+          ctaLabel={flowCopy[purchasePhase].ctaLabel}
+          ctaDisabled={
+            (purchasePhase === "prepare" && scraping) ||
+            (purchasePhase === "proposal" && markableItems.length === 0) ||
+            (purchasePhase === "cart" && markableItems.length === 0)
+          }
+          onCta={handlePrimaryAction}
+          secondaryActions={secondaryActions}
+        />
+
         {/* Mejor combinación (resultado optimizado) */}
-        <div className="border-border-soft bg-bg-card rounded-2xl border p-5">
+        <div className="app-card">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-text-primary text-base font-bold">
                 Mejor combinación para ti
               </h2>
               {displayResult && (
-                <span className="bg-greenCustom-100 text-greenCustom-700 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold">
+                <span className="badge-success">
                   <SparklesIcon className="h-3 w-3" strokeWidth={2} />{" "}
                   Optimización activa
                 </span>
               )}
             </div>
-            <button
-              onClick={() => onGenerateOptimal()}
-              disabled={items.length === 0}
-              className="border-border-default bg-bg-soft text-text-primary hover:bg-greenCustom-100 hover:text-greenCustom-700 flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all disabled:opacity-40"
-            >
-              <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} /> Recalcular
-            </button>
           </div>
           <p className="text-text-muted mt-1 text-sm">
             Seleccionamos la mejor combinación según tu presupuesto y
@@ -529,24 +764,18 @@ export function OptimizacionView({
                 Genera la lista óptima para ver la mejor combinación
               </p>
               <p className="text-text-muted text-xs">
-                Actualiza precios primero, luego haz click en Recalcular
+                Sigue el CTA principal para actualizar precios y optimizar esta
+                compra
               </p>
-              <button
-                onClick={() => onGenerateOptimal()}
-                disabled={items.length === 0}
-                className="text-text-primary mt-3 cursor-pointer rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
-              >
-                Generar Lista Óptima
-              </button>
             </div>
           ) : (
             <>
               {displayResult.overBudget && (
-                <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                  <p className="text-sm font-bold text-amber-800">
+                <div className="app-row border-warning-border mt-4 rounded-xl border p-4">
+                  <p className="text-warning text-sm font-bold">
                     ⚠️ Tus requeridos no caben en el presupuesto
                   </p>
-                  <p className="mt-1 text-xs leading-snug text-amber-700">
+                  <p className="text-warning mt-1 text-xs leading-snug">
                     {displayResult.requiredDropped.length} producto
                     {displayResult.requiredDropped.length !== 1 ? "s" : ""}{" "}
                     requerido
@@ -564,10 +793,10 @@ export function OptimizacionView({
               )}
               <div className="mt-4 flex gap-4">
                 {/* Stats card */}
-                <div className="bg-greenCustom-100 w-52 shrink-0 rounded-2xl p-4">
+                <div className="stat-card-premium w-52 shrink-0 pb-6">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">⭐</span>
-                    <span className="text-greenCustom-800 text-sm font-bold">
+                    <span className="text-text-primary text-sm font-bold">
                       {coverage >= 90
                         ? "Muy buena elección"
                         : coverage >= 70
@@ -575,7 +804,7 @@ export function OptimizacionView({
                           : "Cobertura parcial"}
                     </span>
                   </div>
-                  <p className="text-greenCustom-700 mt-2 text-xs leading-snug">
+                  <p className="text-success mt-2 text-xs leading-snug">
                     Logramos cubrir el {coverage}% de tus necesidades usando
                     inteligentemente tu presupuesto.
                   </p>
@@ -601,16 +830,14 @@ export function OptimizacionView({
                       },
                     ].map(({ label, value, cls }) => (
                       <div key={label}>
-                        <p className="text-greenCustom-700 text-[10px]">
-                          {label}
-                        </p>
+                        <p className="text-text-muted text-[10px]">{label}</p>
                         <p className={`text-xs font-bold ${cls}`}>{value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="bg-greenCustom-200 mt-3 h-1.5 overflow-hidden rounded-full">
+                  <div className="bg-bg-soft mt-3 h-1.5 overflow-hidden rounded-full">
                     <div
-                      className="bg-greenCustom-700 h-full rounded-full transition-all"
+                      className="bg-success h-full rounded-full transition-all"
                       style={{ width: `${coverage}%` }}
                     />
                   </div>
@@ -621,7 +848,7 @@ export function OptimizacionView({
                   <p className="text-text-primary mb-3 text-sm font-semibold">
                     Productos seleccionados ({selectedItems.length})
                   </p>
-                  <div className="divide-border-soft flex flex-col divide-y">
+                  <div className="flex flex-col">
                     {(expandedSection["selected"]
                       ? selectedItems
                       : selectedItems.slice(0, 3)
@@ -644,7 +871,7 @@ export function OptimizacionView({
                       return (
                         <div
                           key={kItem.id}
-                          className="flex items-center gap-3 py-2.5"
+                          className="app-row flex items-center gap-3 border-b py-2.5 last:border-0"
                         >
                           {meta && (
                             <div
@@ -667,12 +894,10 @@ export function OptimizacionView({
                               {kItem.cost ? formatPrice(kItem.cost) : "—"}
                             </p>
                             {isCheapest && (
-                              <span className="bg-success-bg text-success rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-                                Mejor precio
-                              </span>
+                              <span className="chip-success">Mejor precio</span>
                             )}
                             {!isCheapest && savings > 0 && (
-                              <span className="bg-tag-important-bg text-tag-important-text rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+                              <span className="chip-success">
                                 Ahorro {formatPrice(savings)}
                               </span>
                             )}
@@ -689,7 +914,7 @@ export function OptimizacionView({
                           selected: !p["selected"],
                         }))
                       }
-                      className="text-greenCustom-600 hover:text-greenCustom-700 mt-2 flex cursor-pointer items-center gap-1 text-xs font-semibold"
+                      className="text-brand-700 hover:text-brand-800 mt-2 flex cursor-pointer items-center gap-1 text-xs font-semibold"
                     >
                       {expandedSection["selected"]
                         ? "Ver menos ↑"
@@ -701,7 +926,7 @@ export function OptimizacionView({
 
               {/* Excluidos */}
               {displayResult.excluded.length > 0 && (
-                <div className="border-border-soft mt-4 border-t pt-4">
+                <div className="mt-5 pt-1">
                   <button
                     onClick={() => setExcludedOpen(!excludedOpen)}
                     className="text-text-muted flex w-full cursor-pointer items-center gap-1 text-[11px] font-semibold"
@@ -721,18 +946,18 @@ export function OptimizacionView({
                     {displayResult.excluded.length})
                   </button>
                   {excludedOpen && (
-                    <div className="divide-border-soft mt-2 flex flex-col divide-y opacity-60">
+                    <div className="mt-2 flex flex-col opacity-60">
                       {displayResult.excluded.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between py-2"
+                          className="app-row flex items-center justify-between border-b py-2 last:border-0"
                         >
                           <p className="text-text-muted flex items-center gap-1.5 text-xs">
                             <span className="line-through">
                               {item.name} — {item.formatQty}
                             </span>
                             {item.is_required && (
-                              <span className="bg-tag-essential-bg text-tag-essential-text rounded-full px-1.5 py-0.5 text-[9px] font-bold no-underline">
+                              <span className="chip-brand no-underline">
                                 Requerido
                               </span>
                             )}
@@ -746,24 +971,6 @@ export function OptimizacionView({
                   )}
                 </div>
               )}
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  onClick={() => onGenerateOptimal()}
-                  disabled={items.length === 0}
-                  className="bg-accent-gold-soft text-text-primary flex-1 cursor-pointer rounded-xl py-2.5 text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
-                >
-                  Generar Lista Óptima
-                </button>
-                <button
-                  onClick={openMark}
-                  disabled={markableItems.length === 0}
-                  className="bg-greenCustom-700 hover:bg-greenCustom-800 flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
-                >
-                  <ShoppingCart className="h-4 w-4" strokeWidth={2} /> Marcar
-                  como comprado
-                </button>
-              </div>
             </>
           )}
         </div>
@@ -772,14 +979,12 @@ export function OptimizacionView({
       {/* ── Panel derecho ───────────────────────────────────────────────── */}
       <div className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto">
         {/* Card 1: Precios */}
-        <div className="border-border-soft bg-bg-card rounded-2xl border p-4">
+        <div className="app-card p-4">
           <h3 className="text-text-primary mb-3 font-bold">
             Precios actualizados
           </h3>
-          <div className="bg-bg-soft flex items-center gap-3 rounded-xl px-3 py-2.5">
-            <div className="bg-greenCustom-700 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white">
-              J
-            </div>
+          <div className="app-row flex items-center gap-3 rounded-xl px-3 py-2.5">
+            <div className="icon-box-brand h-9 w-9 text-sm font-bold">J</div>
             <div className="min-w-0 flex-1">
               <p className="text-text-primary text-sm font-semibold">
                 Supermercado
@@ -791,21 +996,10 @@ export function OptimizacionView({
               </p>
             </div>
             <CircleCheck
-              className={`h-5 w-5 shrink-0 ${lastScrapeTs ? "text-greenCustom-600" : "text-text-muted"}`}
+              className={`h-5 w-5 shrink-0 ${lastScrapeTs ? "text-success" : "text-text-muted"}`}
               strokeWidth={1.75}
             />
           </div>
-          <button
-            onClick={onScrape}
-            disabled={scraping}
-            className="bg-greenCustom-700 hover:bg-greenCustom-800 mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${scraping ? "animate-spin" : ""}`}
-              strokeWidth={2}
-            />
-            {scraping ? "Actualizando…" : "Actualizar precios"}
-          </button>
           {scrapeMsg && (
             <p className="text-text-muted mt-2 text-center text-[11px]">
               {scrapeMsg}
@@ -819,13 +1013,13 @@ export function OptimizacionView({
         </div>
 
         {/* Card 2: Acciones de la lista óptima */}
-        <div className="border-border-soft bg-bg-card rounded-2xl border p-4">
+        <div className="app-card p-4">
           <h3 className="text-text-primary mb-3 font-bold">Tu lista óptima</h3>
           {displayResult ? (
             <div className="flex flex-col gap-2">
               {/* Contador para cuadrar con el carro del supermercado, que
                   cuenta unidades (sku × cantidad), no productos distintos. */}
-              <div className="border-border-soft divide-border-soft bg-bg-soft mb-1 flex items-stretch divide-x rounded-xl border">
+              <div className="app-row divide-border-soft mb-1 flex items-stretch divide-x rounded-xl border">
                 {[
                   { label: "Productos", value: markableItems.length },
                   { label: "Unidades", value: totalUnits },
@@ -845,25 +1039,11 @@ export function OptimizacionView({
                   quedan fuera.
                 </p>
               )}
-              <button
-                onClick={() => onShareWhatsApp(displayResult)}
-                className="cursor-pointer rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90"
-              >
-                Compartir por WhatsApp
-              </button>
-              <button
-                onClick={handleFillCart}
-                disabled={markableItems.length === 0}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#1fa02e] py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
-              >
-                <ExternalLink className="h-4 w-4" strokeWidth={2} /> Llenar
-                carro en Supermercado
-              </button>
             </div>
           ) : (
             <p className="text-text-muted text-xs">
-              Genera la lista óptima para compartirla o llenar el carro de
-              Supermercado con un click.
+              Genera la optimización para ver la mejor combinación según tu
+              presupuesto.
             </p>
           )}
         </div>

@@ -15,7 +15,7 @@ export const CATEGORIES = [
   "Despensa",
 ] as const;
 
-export const UNITS: Unit[] = ["un", "kg", "L", "g", "ml"];
+const UNITS: Unit[] = ["un", "kg", "L", "g", "ml"];
 
 export const CATEGORY_META: Record<
   string,

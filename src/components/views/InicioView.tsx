@@ -68,10 +68,7 @@ export function InicioView({
             sub: null,
           },
         ].map(({ label, value, warn, sub }) => (
-          <div
-            key={label}
-            className="border-border-soft bg-bg-card rounded-2xl border p-5"
-          >
+          <div key={label} className="stat-card">
             <p className="text-text-muted mb-2 text-[11px] font-medium tracking-wide uppercase">
               {label}
             </p>
@@ -89,21 +86,19 @@ export function InicioView({
         <div className="flex flex-col gap-4">
           <button
             onClick={() => onNavigate("inventario")}
-            className="border-greenCustom-200 bg-greenCustom-100 flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-left transition-all hover:opacity-90"
+            className="section-action-card flex cursor-pointer items-center gap-3 p-4 text-left"
           >
             <span className="text-xl">🗂️</span>
             <div>
-              <p className="text-greenCustom-800 font-semibold">
-                Ver Inventario
-              </p>
-              <p className="text-greenCustom-700 text-xs">
+              <p className="text-text-primary font-semibold">Ver Inventario</p>
+              <p className="text-brand-700 text-xs">
                 {itemCount} productos · Actualiza el stock
               </p>
             </div>
           </button>
           <button
             onClick={() => onNavigate("optimizacion")}
-            className="border-accent-beige bg-accent-cream flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-left transition-all hover:opacity-90"
+            className="section-action-card flex cursor-pointer items-center gap-3 p-4 text-left"
           >
             <span className="text-xl">✨</span>
             <div>
@@ -119,7 +114,7 @@ export function InicioView({
 
         {/* Compact category chart */}
         {chartEntries.length > 0 && (
-          <div className="border-border-soft bg-bg-card rounded-2xl border px-5 py-4">
+          <div className="app-card px-5 py-4">
             <p className="text-text-muted mb-3 text-xs font-semibold tracking-wide uppercase">
               Tu lista por categoría
             </p>
@@ -136,7 +131,7 @@ export function InicioView({
                     </span>
                     <div className="bg-border-soft h-1.5 flex-1 overflow-hidden rounded-full">
                       <div
-                        className="bg-greenCustom-600 h-full rounded-full transition-all duration-500"
+                        className="bg-success h-full rounded-full transition-all duration-500"
                         style={{
                           width: `${Math.round((count / chartMax) * 100)}%`,
                         }}

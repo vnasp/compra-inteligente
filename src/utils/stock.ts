@@ -5,9 +5,9 @@ import type { ShoppingListItem } from "@/types/shopping";
  * se recompran cada vez según lo que queda hoy. Para ellas NO se descuenta lo ya
  * comprado en el ciclo (`bought`), a diferencia de la despensa de compra mensual.
  */
-export const PERISHABLE_CATEGORIES = new Set(["Frutas", "Verduras"]);
+const PERISHABLE_CATEGORIES = new Set(["Frutas", "Verduras"]);
 
-export function isPerishable(item: ShoppingListItem): boolean {
+function isPerishable(item: ShoppingListItem): boolean {
   return PERISHABLE_CATEGORIES.has(item.category);
 }
 
@@ -52,15 +52,30 @@ export function stockAppearance(ratio: number): {
   if (ratio <= 0)
     return {
       label: "Sin stock",
-      color: "#BE123C",
-      bg: "#FFF1F2",
-      bar: "#FB7185",
+      color: "var(--color-danger-700)",
+      bg: "var(--color-danger-bg)",
+      bar: "var(--color-danger)",
     };
   if (ratio < 0.5)
-    return { label: "Poco", color: "#C2410C", bg: "#FFF7ED", bar: "#FB923C" };
+    return {
+      label: "Poco",
+      color: "var(--color-warning-700)",
+      bg: "var(--color-warning-bg)",
+      bar: "var(--color-warning)",
+    };
   if (ratio < 1)
-    return { label: "Medio", color: "#A16207", bg: "#FEFCE8", bar: "#FBBF24" };
-  return { label: "Completo", color: "#15803D", bg: "#F0FDF4", bar: "#34D399" };
+    return {
+      label: "Medio",
+      color: "var(--color-warning-700)",
+      bg: "var(--color-warning-bg)",
+      bar: "var(--color-warning)",
+    };
+  return {
+    label: "Completo",
+    color: "var(--color-success-700)",
+    bg: "var(--color-success-bg)",
+    bar: "var(--color-success)",
+  };
 }
 
 /** Unidad en que se cuenta el stock/objetivo mensual de un producto. */

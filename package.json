@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:quiet": "next build 2>&1 | tail -5",
+    "build:quiet": "next build 2>&1",
     "start": "next start",
     "lint": "eslint",
     "lint-staged": "lint-staged",
     "test:coverage:quiet": "echo 'No tests configured' && exit 0",
-    "prepare": "husky"
+    "prepare": "husky",
+    "knip": "knip"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -24,6 +25,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "knip": "^6.31.0",
     "lucide-react": "^1.17.0",
     "next": "^16.2.7",
     "react": "19.2.4",

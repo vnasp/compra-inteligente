@@ -7,8 +7,7 @@ import {
   stripSizeFromText,
   type JumboCandidate,
 } from "@/utils/jumbo";
-
-const MAX_RESULTS = 12;
+import { JUMBO_SEARCH_MAX_RESULTS } from "@/config";
 
 async function fetchSearch(query: string): Promise<JumboCandidate[]> {
   const html = await fetchJumboHtml(buildSearchUrl(query));
@@ -31,7 +30,9 @@ export async function GET(request: NextRequest) {
       const stripped = stripSizeFromText(q);
       if (stripped && stripped !== q) results = await fetchSearch(stripped);
     }
-    return NextResponse.json({ results: results.slice(0, MAX_RESULTS) });
+    return NextResponse.json({
+      results: results.slice(0, JUMBO_SEARCH_MAX_RESULTS),
+    });
   } catch (err) {
     if (err instanceof JumboRateLimitError) {
       return NextResponse.json(

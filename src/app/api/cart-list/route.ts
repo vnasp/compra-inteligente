@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Falta la tabla pantry_cart_snapshot: aplica la migración 20260730010000_cart_snapshot.sql en Supabase.",
+            "Falta la tabla pantry_cart_snapshot: aplica la migración 000_schema.sql en Supabase.",
         },
         { status: 503, headers: corsHeaders() },
       );

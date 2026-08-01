@@ -1,4 +1,10 @@
 import type { Unit } from "@/types/shopping";
+import {
+  JUMBO_CART_CHUNK_PAUSE_MS,
+  JUMBO_CART_CHUNK_SIZE,
+  JUMBO_REQUEST_JITTER_MS,
+  JUMBO_REQUEST_MIN_INTERVAL_MS,
+} from "@/config";
 
 // Utilidades compartidas para integrar con Supermercado (VTEX).
 // - Búsqueda en jumbo.cl/busqueda (Constructor.io) → candidatos {sku, name, price, image, slug}.
@@ -29,7 +35,7 @@ import type { Unit } from "@/types/shopping";
 // 4. **Backoff, no insistencia**: ante 429/503 se lanza `JumboRateLimitError`,
 //    se corta la corrida y se respeta `Retry-After`. Cero reintentos en loop.
 // 5. **Volumen mínimo**: solo a pedido explícito del usuario (botón), en tandas,
-//    saltando los precios ya frescos (ver `FRESH_PRICE_HOURS` en page.tsx) y con
+//    saltando los precios ya frescos (ver `PRICE_FRESH_HOURS` en config.ts) y con
 //    búsqueda por sku (1 request por producto en vez de 2). No hay crawling
 //    programado ni recorrido de catálogo.
 //
@@ -38,11 +44,7 @@ import type { Unit } from "@/types/shopping";
 
 const SCRAPER_CONTACT = process.env.SCRAPER_CONTACT ?? "uso personal";
 
-export const JUMBO_UA = `Mozilla/5.0 (compatible; SmartPantryBot/1.0; +${SCRAPER_CONTACT})`;
-
-/** Separación mínima entre requests a Supermercado (más jitter) */
-const MIN_INTERVAL_MS = 1000;
-const JITTER_MS = 400;
+const JUMBO_UA = `Mozilla/5.0 (compatible; SmartPantryBot/1.0; +${SCRAPER_CONTACT})`;
 
 /** Error de rate limit: corta la corrida y dice cuánto esperar. */
 export class JumboRateLimitError extends Error {
@@ -67,7 +69,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Devuelve null si la respuesta no es OK (ej. 404).
  */
 export async function fetchJumboHtml(url: string): Promise<string | null> {
-  const gap = MIN_INTERVAL_MS + Math.random() * JITTER_MS;
+  const gap =
+    JUMBO_REQUEST_MIN_INTERVAL_MS + Math.random() * JUMBO_REQUEST_JITTER_MS;
   const wait = lastRequestAt + gap - Date.now();
   if (wait > 0) await sleep(wait);
   lastRequestAt = Date.now();
@@ -280,10 +283,6 @@ function decodeEntities(s: string): string {
 // esa pestaña**: aquí solo se generan skus y cantidades.
 
 const CART_BFF = "be-reg-groceries-bff-jumbo.ecomm.cencosud.com";
-/** Productos por request al BFF */
-const CART_CHUNK = 10;
-/** Pausa entre tandas, para no golpear el BFF */
-const CART_CHUNK_PAUSE_MS = 400;
 /**
  * Tienda del carro. El id depende de la zona **y del modo de entrega** (se vio
  * `jumboclj512` en un carro de despacho y `jumboclj506` en un pedido de retiro);
@@ -409,8 +408,8 @@ function cartIIFE(listUrl: string): string {
 
   let ok = 0, reauthed = false;
   const fails = [];
-  for (let i = 0; i < ITEMS.length; i += ${CART_CHUNK}) {
-    const chunk = ITEMS.slice(i, i + ${CART_CHUNK});
+  for (let i = 0; i < ITEMS.length; i += ${JUMBO_CART_CHUNK_SIZE}) {
+    const chunk = ITEMS.slice(i, i + ${JUMBO_CART_CHUNK_SIZE});
     let res = await post(chunk);
 
     // Un solo reintento con headers prestados si la sesión guardada no sirve.
@@ -422,8 +421,8 @@ function cartIIFE(listUrl: string): string {
 
     if (res.ok) ok += chunk.length;
     else fails.push(\`\${res.status}: \${(await res.text()).slice(0, 120)}\`);
-    console.log(\`tanda \${Math.floor(i / ${CART_CHUNK}) + 1}: \${res.status} · \${ok}/\${ITEMS.length}\`);
-    await new Promise((r) => setTimeout(r, ${CART_CHUNK_PAUSE_MS}));
+    console.log(\`tanda \${Math.floor(i / ${JUMBO_CART_CHUNK_SIZE}) + 1}: \${res.status} · \${ok}/\${ITEMS.length}\`);
+    await new Promise((r) => setTimeout(r, ${JUMBO_CART_CHUNK_PAUSE_MS}));
   }
   return \`\${ok} de \${ITEMS.length} productos agregados\` + (fails.length ? \` · errores: \${fails.join(" | ")}\` : "") + " · actualiza la página y luego revisa tu carro";
 })()`;

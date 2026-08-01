@@ -21,6 +21,11 @@ import { InicioView } from "@/components/views/InicioView";
 import { InventarioView } from "@/components/views/InventarioView";
 import { OptimizacionView } from "@/components/views/OptimizacionView";
 import { HistorialView } from "@/components/views/HistorialView";
+import {
+  PRICE_FRESH_HOURS,
+  PRICE_SCRAPE_BATCH_PAUSE_MS,
+  PRICE_SCRAPE_BATCH_SIZE,
+} from "@/config";
 import type {
   ShoppingListItem,
   UserConfig,
@@ -28,17 +33,6 @@ import type {
   PurchaseItem,
   PriceHistorySummary,
 } from "@/types/shopping";
-
-// ── Scraping de precios en tandas ──────────────────────────────────────
-// Productos por request: el route acepta hasta 15 y una tanda de 12 tarda ~14 s
-// (el pacing de ~1 req/s lo aplica utils/jumbo).
-const SCRAPE_BATCH_SIZE = 12;
-// Pausa entre tandas, además del espaciado por request. Súbela (ej. 60_000)
-// si Supermercado empieza a responder 429.
-const SCRAPE_BATCH_PAUSE_MS = 15_000;
-// No se vuelve a pedir un precio scrapeado hace menos de esto: evita repetir
-// trabajo sobre el sitio de Supermercado si se aprieta el botón dos veces.
-const FRESH_PRICE_HOURS = 6;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -227,17 +221,30 @@ export default function Dashboard() {
   const handleScrape = async () => {
     if (items.length === 0) return;
 
-    const freshCutoff = Date.now() - FRESH_PRICE_HOURS * 3600_000;
-    const pending = items.filter(
+    const currentPurchaseItems = items.filter(
+      (item) =>
+        suggestedQty(
+          item,
+          stockRemaining[item.id] ?? null,
+          boughtThisCycle[item.id] ?? 0,
+        ) > 0,
+    );
+    const freshCutoff = Date.now() - PRICE_FRESH_HOURS * 3600_000;
+    const pending = currentPurchaseItems.filter(
       (i) =>
         !i.price_updated_at ||
         new Date(i.price_updated_at).getTime() < freshCutoff,
     );
-    const skipped = items.length - pending.length;
+    const skipped = currentPurchaseItems.length - pending.length;
+
+    if (currentPurchaseItems.length === 0) {
+      setScrapeMsg("No hay productos pendientes para esta compra");
+      return;
+    }
 
     if (pending.length === 0) {
       setScrapeMsg(
-        `Todos los precios se actualizaron hace menos de ${FRESH_PRICE_HOURS} h`,
+        `Los precios de esta compra se actualizaron hace menos de ${PRICE_FRESH_HOURS} h`,
       );
       return;
     }
@@ -249,8 +256,8 @@ export default function Dashboard() {
     const supabase = createClient();
 
     const batches: ShoppingListItem[][] = [];
-    for (let i = 0; i < pending.length; i += SCRAPE_BATCH_SIZE) {
-      batches.push(pending.slice(i, i + SCRAPE_BATCH_SIZE));
+    for (let i = 0; i < pending.length; i += PRICE_SCRAPE_BATCH_SIZE) {
+      batches.push(pending.slice(i, i + PRICE_SCRAPE_BATCH_SIZE));
     }
 
     // Precio previo por producto, para la tendencia ↑↓ (se actualiza tanda a tanda)
@@ -357,7 +364,7 @@ export default function Dashboard() {
       if (rateLimited) break;
 
       // Pausa entre tandas, además del espaciado por request
-      if (b < batches.length - 1) await sleep(SCRAPE_BATCH_PAUSE_MS);
+      if (b < batches.length - 1) await sleep(PRICE_SCRAPE_BATCH_PAUSE_MS);
     }
 
     const notes = [
@@ -619,7 +626,10 @@ export default function Dashboard() {
             onShareWhatsApp={handleShareWhatsApp}
             onMarkPurchased={handleMarkPurchased}
             onSaveCartSnapshot={handleSaveCartSnapshot}
+            onResetCurrentPurchase={() => setKnapsackResult(null)}
+            onOpenInventory={() => setActiveView("inventario")}
             onOpenList={() => setActiveView("mi-lista")}
+            onOpenHistory={() => setActiveView("historial")}
           />
         )}
 
