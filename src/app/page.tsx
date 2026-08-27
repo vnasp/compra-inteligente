@@ -15,6 +15,7 @@ import {
   autoCycleStart,
 } from "@/utils/dates";
 import { solveKnapsack, buildKnapsackItems } from "@/utils/knapsack";
+import { needsPriceAttempt } from "@/utils/prices";
 import type { KnapsackResult } from "@/utils/knapsack";
 import { TopBar } from "@/components/views/TopBar";
 import { InicioView } from "@/components/views/InicioView";
@@ -229,12 +230,7 @@ export default function Dashboard() {
           boughtThisCycle[item.id] ?? 0,
         ) > 0,
     );
-    const freshCutoff = Date.now() - PRICE_FRESH_HOURS * 3600_000;
-    const pending = currentPurchaseItems.filter(
-      (i) =>
-        !i.price_updated_at ||
-        new Date(i.price_updated_at).getTime() < freshCutoff,
-    );
+    const pending = currentPurchaseItems.filter((i) => needsPriceAttempt(i));
     const skipped = currentPurchaseItems.length - pending.length;
 
     if (currentPurchaseItems.length === 0) {
@@ -244,7 +240,7 @@ export default function Dashboard() {
 
     if (pending.length === 0) {
       setScrapeMsg(
-        `Los precios de esta compra se actualizaron hace menos de ${PRICE_FRESH_HOURS} h`,
+        `Ya se consultaron los precios de esta compra hace menos de ${PRICE_FRESH_HOURS} h`,
       );
       return;
     }
@@ -265,8 +261,10 @@ export default function Dashboard() {
 
     let processed = 0;
     let updated = 0;
+    let notFound = 0;
     let failedBatches = 0;
     let rateLimited = false;
+    let missingAttemptColumn = false;
 
     const progress = (batchIdx: number) =>
       setScrapeMsg(
@@ -307,6 +305,29 @@ export default function Dashboard() {
             .update({ last_price: p.price, price_updated_at: now })
             .eq("id", p.id);
         }
+
+        // Se marca el intento en TODA la tanda, con o sin precio. Los que el
+        // supermercado no matchea nunca reciben `price_updated_at`, y sin esta
+        // marca quedarían pendientes para siempre, trabando el paso a optimizar.
+        const attemptedIds = batch.map((i) => i.id);
+        const { error: attemptError } = await supabase
+          .from("pantry_shopping_list_items")
+          .update({ price_attempted_at: now })
+          .in("id", attemptedIds);
+        // PGRST204 = falta la columna: la migración 001 no se ha aplicado.
+        // No se corta la corrida; el intento queda solo en memoria.
+        if (attemptError?.code === "PGRST204") missingAttemptColumn = true;
+        else if (attemptError) throw attemptError;
+
+        const attempted = new Set(attemptedIds);
+        setItems((prev) =>
+          prev.map((item) =>
+            attempted.has(item.id)
+              ? { ...item, price_attempted_at: now }
+              : item,
+          ),
+        );
+        notFound += batch.length - found.length;
 
         if (found.length > 0) {
           await supabase.from("pantry_price_history").insert(
@@ -369,9 +390,13 @@ export default function Dashboard() {
 
     const notes = [
       skipped > 0 ? `${skipped} ya estaban frescos` : "",
+      notFound > 0 ? `${notFound} sin precio en el supermercado` : "",
       failedBatches > 0 ? `${failedBatches} tanda(s) con error` : "",
       rateLimited
         ? "Supermercado pidió esperar: se detuvo la actualización"
+        : "",
+      missingAttemptColumn
+        ? "Falta la columna price_attempted_at: aplica la migración 001 en Supabase"
         : "",
     ].filter(Boolean);
 
