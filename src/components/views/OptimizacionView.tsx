@@ -20,7 +20,7 @@ import type { KnapsackItem, KnapsackResult } from "@/utils/knapsack";
 import { buildCartBookmarklet, CART_BOOKMARK_NAME } from "@/utils/jumbo";
 import type { ShoppingListItem, PriceHistorySummary } from "@/types/shopping";
 import { useToast } from "@/components/ui/Toast";
-import { PRICE_FRESH_HOURS } from "@/config";
+import { needsPriceAttempt, isUnpriced } from "@/utils/prices";
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -117,13 +117,18 @@ export function OptimizacionView({
     return drop > 0 ? sum + drop * qtyOf(item) : sum;
   }, 0);
   const currentPurchaseItems = items.filter((item) => qtyOf(item) > 0);
-  const freshPriceCutoff = Date.now() - PRICE_FRESH_HOURS * 3600_000;
-  const stalePriceCount = currentPurchaseItems.filter(
-    (item) =>
-      !item.price_updated_at ||
-      new Date(item.price_updated_at).getTime() < freshPriceCutoff,
+  // Pendientes = a los que todavía no se les ha pedido precio. Los que el
+  // supermercado no matchea sí quedan marcados como intentados, así que dejan
+  // de contar acá: antes se quedaban stale para siempre y el CTA nunca pasaba
+  // de "Actualizar precios".
+  const pendingPriceCount = currentPurchaseItems.filter((item) =>
+    needsPriceAttempt(item),
   ).length;
-  const pricesReady = currentPurchaseItems.length > 0 && stalePriceCount === 0;
+  // Sin precio pese al intento. No bloquea: `solveKnapsack` los trata como
+  // `cost: null`, los incluye en la lista y no los carga al presupuesto.
+  const unpricedItems = currentPurchaseItems.filter(isUnpriced);
+  const pricesReady =
+    currentPurchaseItems.length > 0 && pendingPriceCount === 0;
 
   // Items de la lista óptima que se pueden marcar como comprados
   const markableItems: KnapsackItem[] = displayResult
@@ -264,13 +269,22 @@ export function OptimizacionView({
       : prepareHasNoPendingProducts
         ? "No hay productos pendientes"
         : "Prepara tu próxima compra";
+  // Con precios ya consultados pero alguno sin resultado, se avisa y se deja
+  // avanzar: la propuesta se genera igual, sin cargarlos al presupuesto.
   const prepareDescription = prepareNeedsPrices
-    ? `${stalePriceCount} producto${stalePriceCount !== 1 ? "s tienen" : " tiene"} precios vencidos o sin precio. Actualízalos para generar una propuesta confiable.`
-    : prepareHasNoProducts
-      ? "Crea una lista con los productos que podrías necesitar para iniciar el flujo de compra."
-      : prepareHasNoPendingProducts
-        ? "Tu inventario y compras del ciclo indican que no necesitas comprar productos por ahora."
-        : "Revisa inventario y lista si hace falta. Cuando estés lista, genera una propuesta optimizada.";
+    ? `${pendingPriceCount} producto${pendingPriceCount !== 1 ? "s tienen" : " tiene"} precios vencidos o sin consultar. Actualízalos para generar una propuesta confiable.`
+    : unpricedItems.length > 0 && purchasePhase === "prepare"
+      ? `${unpricedItems.length} producto${unpricedItems.length !== 1 ? "s no tienen" : " no tiene"} precio en el supermercado (${unpricedItems
+          .slice(0, 3)
+          .map((i) => i.name)
+          .join(
+            ", ",
+          )}${unpricedItems.length > 3 ? "…" : ""}). Entran a la lista, pero no suman al presupuesto.`
+      : prepareHasNoProducts
+        ? "Crea una lista con los productos que podrías necesitar para iniciar el flujo de compra."
+        : prepareHasNoPendingProducts
+          ? "Tu inventario y compras del ciclo indican que no necesitas comprar productos por ahora."
+          : "Revisa inventario y lista si hace falta. Cuando estés lista, genera una propuesta optimizada.";
   const prepareCtaLabel = prepareNeedsPrices
     ? scraping
       ? "Actualizando..."

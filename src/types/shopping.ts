@@ -14,6 +14,8 @@ export interface ShoppingListItem {
   package_unit: Unit | null;
   last_price: number | null; // precio en CLP, sin decimales
   price_updated_at: string | null; // ISO timestamp
+  /** Último intento de scraping, haya encontrado precio o no (ISO timestamp) */
+  price_attempted_at: string | null;
   /** SKU del producto en Supermercado (VTEX), para armar el carro online */
   jumbo_sku: string | null;
   /** Nombre del producto en Supermercado, para mostrar el vínculo */
@@ -27,7 +29,12 @@ export interface ShoppingListItem {
 // Para crear un ítem (sin campos autogenerados)
 type NewShoppingListItem = Omit<
   ShoppingListItem,
-  "id" | "last_price" | "price_updated_at" | "created_at" | "updated_at"
+  | "id"
+  | "last_price"
+  | "price_updated_at"
+  | "price_attempted_at"
+  | "created_at"
+  | "updated_at"
 >;
 
 // ── Configuración del usuario ──────────────────────────────────────────
